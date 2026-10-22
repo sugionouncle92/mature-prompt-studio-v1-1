@@ -11,6 +11,8 @@ export const translations = {
     notConnected: 'Belum Terhubung',
     settingsBtn: 'API & Pengaturan',
     langSelectorLabel: 'Bahasa Antarmuka',
+    expandSection: 'Tampilkan',
+    collapseSection: 'Sembunyikan',
 
     // Core Inputs
     inputsTitle: 'Input Utama Adegan',
@@ -334,6 +336,8 @@ export const translations = {
     notConnected: 'Not Connected',
     settingsBtn: 'API & Settings',
     langSelectorLabel: 'Interface Language',
+    expandSection: 'Show',
+    collapseSection: 'Hide',
 
     // Core Inputs
     inputsTitle: 'Core Scene Inputs',

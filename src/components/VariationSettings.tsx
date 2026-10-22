@@ -1,5 +1,5 @@
-import React from 'react';
-import { Layers, Sliders, Maximize2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Layers, Sliders, Maximize2, ChevronDown } from 'lucide-react';
 import { VariationConfig, VariationPreset, AspectRatioOption } from '../types/index.ts';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -17,6 +17,8 @@ export const VariationSettings: React.FC<VariationSettingsProps> = ({
   onAspectRatioChange,
 }) => {
   const { t } = useLanguage();
+  // Section collapsed/expanded state (Default: HIDE)
+  const [isExpanded, setIsExpanded] = useState(false);
   const presets: VariationPreset[] = [1, 3, 5, 10];
   const MAX_CUSTOM = 15;
 
@@ -50,28 +52,53 @@ export const VariationSettings: React.FC<VariationSettingsProps> = ({
   const currentRatioObj = aspectRatios.find(r => r.id === aspectRatio) || aspectRatios[0];
 
   return (
-    <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+    <section className={`bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm transition-all duration-200 ${isExpanded ? 'space-y-5' : ''}`}>
       {/* 1. Variation Count Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-        <div>
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-amber-400" />
-            {t.variationTitle}
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`flex items-center justify-between gap-3 cursor-pointer select-none group transition ${
+          isExpanded ? 'pb-3 border-b border-slate-800' : ''
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2 group-hover:text-amber-300 transition-colors">
+              <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{t.variationTitle}</span>
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+              {activeCount} {activeCount === 1 ? t.promptsUnitSingular : t.promptsUnitPlural} {aspectRatio !== 'auto' ? `• ${aspectRatio}` : ''}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5 truncate sm:whitespace-normal">
             {t.variationSubtitle}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="text-xs text-slate-400">{t.targetPromptsLabel}</span>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
-            {activeCount} {activeCount === 1 ? t.promptsUnitSingular : t.promptsUnitPlural}
-          </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Expand/Collapse Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            aria-expanded={isExpanded}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition group-hover:border-slate-600"
+          >
+            <span className="hidden sm:inline">{isExpanded ? t.collapseSection : t.expandSection}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                isExpanded ? 'rotate-180 text-amber-400' : ''
+              }`}
+            />
+          </button>
         </div>
       </div>
 
-      {/* Preset Buttons & Custom Input */}
+      {isExpanded && (
+        <>
+          {/* Preset Buttons & Custom Input */}
       <div className="flex flex-wrap items-center gap-2.5">
         {presets.map((num) => {
           const isSelected = config.preset === num;
@@ -164,6 +191,8 @@ export const VariationSettings: React.FC<VariationSettingsProps> = ({
           })}
         </div>
       </div>
+        </>
+      )}
     </section>
   );
 };

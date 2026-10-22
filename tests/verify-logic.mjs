@@ -1627,8 +1627,32 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
   assert.ok(photoStyleSelectorSrc.includes('style.shorthand'), 'PhotographicStyleSelector must render style.shorthand badge');
 
   console.log('✓ All 7 new shorthands (/identitylock, /referencepriority, /facial-consistency, /photorealism, /maximum-detail, /natural-skin-texture, /anti-ai-artifacts) verified with DEFAULT ON, independent toggle, prompt integration, deduplication, and non-photo/no-ref safety.');
+}).then(() => {
+  // 16. Verify Hide/Show Collapsible State on 4 Sections with Default HIDE
+  console.log('Test 16: Verify Hide/Show Collapsible State on 4 Sections with Default HIDE...');
 
-  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (15/15) ---');
+  const storyStyleSrc = fs.readFileSync('src/components/StoryStyleSelector.tsx', 'utf8');
+  assert.ok(storyStyleSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'StoryStyleSelector must default isExpanded to false (HIDE)');
+  assert.ok(storyStyleSrc.includes('ChevronDown'), 'StoryStyleSelector must render chevron indicator');
+
+  const framingSrc = fs.readFileSync('src/components/FramingSelector.tsx', 'utf8');
+  assert.ok(framingSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'FramingSelector must default isExpanded to false (HIDE)');
+  assert.ok(framingSrc.includes('ChevronDown'), 'FramingSelector must render chevron indicator');
+
+  const charLocksSrc = fs.readFileSync('src/components/CharacterLocks.tsx', 'utf8');
+  assert.ok(charLocksSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'CharacterLocks must default isExpanded to false (HIDE)');
+  assert.ok(charLocksSrc.includes('ChevronDown'), 'CharacterLocks must render chevron indicator');
+
+  const variationSrc = fs.readFileSync('src/components/VariationSettings.tsx', 'utf8');
+  assert.ok(variationSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'VariationSettings must default isExpanded to false (HIDE)');
+  assert.ok(variationSrc.includes('ChevronDown'), 'VariationSettings must render chevron indicator');
+
+  assert.ok(translations.id.expandSection && translations.id.collapseSection, 'id translation must have expandSection and collapseSection');
+  assert.ok(translations.en.expandSection && translations.en.collapseSection, 'en translation must have expandSection and collapseSection');
+
+  console.log('✓ Hide/Show Collapsible State verified on all 4 sections with Default HIDE, chevron indicators, and full translation parity.');
+
+  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (16/16) ---');
 }).catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);

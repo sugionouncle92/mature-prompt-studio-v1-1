@@ -20,6 +20,8 @@ export const FramingSelector: React.FC<FramingSelectorProps> = ({
   onChange,
 }) => {
   const { t } = useLanguage();
+  // Section collapsed/expanded state (Default: HIDE)
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -55,44 +57,76 @@ export const FramingSelector: React.FC<FramingSelectorProps> = ({
     getFramingOptionByIdOrName(config.selected) || AUTO_FRAMING_OPTION;
 
   return (
-    <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+    <section className={`bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm transition-all duration-200 ${isExpanded ? 'space-y-4' : ''}`}>
       {/* Header with Title & Toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-        <div>
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <Focus className="w-4 h-4 text-cyan-400" />
-            {t.framingTitle}
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`flex items-center justify-between gap-3 cursor-pointer select-none group transition ${
+          isExpanded ? 'pb-3 border-b border-slate-800' : ''
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2 group-hover:text-cyan-300 transition-colors">
+              <Focus className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span>{t.framingTitle}</span>
+            </h2>
+            <span
+              className={`text-[11px] px-2 py-0.5 rounded-full font-medium border truncate max-w-[200px] ${
+                config.enabled
+                  ? 'text-cyan-400 bg-cyan-950/40 border-cyan-800/60'
+                  : 'text-slate-500 bg-slate-900 border-slate-800'
+              }`}
+            >
+              {config.enabled ? `${activeOption.name}` : t.framingInactiveBadge}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5 truncate sm:whitespace-normal">
             {t.framingSubtitle}
           </p>
         </div>
 
-        {/* Toggle Switch */}
-        <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
-          <span
-            className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-              config.enabled
-                ? 'text-cyan-400 bg-cyan-950/40 border-cyan-800/60'
-                : 'text-slate-500 bg-slate-900 border-slate-800'
-            }`}
+        {/* Header Controls: Switch & Expand */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Toggle Switch */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center"
           >
-            {config.enabled ? t.framingActiveBadge : t.framingInactiveBadge}
-          </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.enabled}
+                onChange={handleToggle}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+            </label>
+          </div>
 
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.enabled}
-              onChange={handleToggle}
-              className="sr-only peer"
+          {/* Expand/Collapse Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            aria-expanded={isExpanded}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition group-hover:border-slate-600"
+          >
+            <span className="hidden sm:inline">{isExpanded ? t.collapseSection : t.expandSection}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                isExpanded ? 'rotate-180 text-cyan-400' : ''
+              }`}
             />
-            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
-          </label>
+          </button>
         </div>
       </div>
 
-      {/* Dropdown Container */}
+      {isExpanded && (
+        <>
+          {/* Dropdown Container */}
       <div className="relative" ref={dropdownRef}>
         {/* Dropdown Button */}
         <button
@@ -220,6 +254,8 @@ export const FramingSelector: React.FC<FramingSelectorProps> = ({
           </div>
         )}
       </div>
+        </>
+      )}
     </section>
   );
 };

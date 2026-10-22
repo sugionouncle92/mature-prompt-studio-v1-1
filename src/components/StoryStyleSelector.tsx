@@ -38,6 +38,8 @@ export const StoryStyleSelector: React.FC<StoryStyleSelectorProps> = ({
   onChange,
 }) => {
   const { t } = useLanguage();
+  // Main section collapsed/expanded state (Default: HIDE)
+  const [isExpanded, setIsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   // All categories hidden/collapsed by default (Default: Hide All)
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
@@ -270,31 +272,68 @@ export const StoryStyleSelector: React.FC<StoryStyleSelectorProps> = ({
     selection.custom.trim().length > 0;
 
   return (
-    <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+    <section className={`bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm transition-all duration-200 ${isExpanded ? 'space-y-4' : ''}`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-        <div>
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-amber-400" />
-            {t.storyStyleTitle}
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`flex items-center justify-between gap-3 cursor-pointer select-none group transition ${
+          isExpanded ? 'pb-3 border-b border-slate-800' : ''
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2 group-hover:text-amber-300 transition-colors">
+              <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{t.storyStyleTitle}</span>
+            </h2>
+            {hasSelections && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 truncate max-w-[200px]">
+                {selection.primary ? selection.primary : t.activeStylesLabel}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5 truncate sm:whitespace-normal">
             {t.storyStyleSubtitle}
           </p>
         </div>
 
-        {hasSelections && (
+        <div className="flex items-center gap-2 shrink-0">
+          {isExpanded && hasSelections && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClearAll();
+              }}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+            >
+              <RotateCcw className="w-3 h-3" />
+              {t.clearStyles}
+            </button>
+          )}
+
           <button
-            onClick={handleClearAll}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition self-start sm:self-auto"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            aria-expanded={isExpanded}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition group-hover:border-slate-600"
           >
-            <RotateCcw className="w-3 h-3" />
-            {t.clearStyles}
+            <span className="hidden sm:inline">{isExpanded ? t.collapseSection : t.expandSection}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                isExpanded ? 'rotate-180 text-amber-400' : ''
+              }`}
+            />
           </button>
-        )}
+        </div>
       </div>
 
-      {/* Active Selections Bar */}
+      {isExpanded && (
+        <>
+          {/* Active Selections Bar */}
       {hasSelections && (
         <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-400 font-medium mr-1">{t.activeStylesLabel}</span>
@@ -1007,6 +1046,8 @@ export const StoryStyleSelector: React.FC<StoryStyleSelectorProps> = ({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </section>
   );
