@@ -1628,12 +1628,16 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   console.log('✓ All 7 new shorthands (/identitylock, /referencepriority, /facial-consistency, /photorealism, /maximum-detail, /natural-skin-texture, /anti-ai-artifacts) verified with DEFAULT ON, independent toggle, prompt integration, deduplication, and non-photo/no-ref safety.');
 }).then(() => {
-  // 16. Verify Hide/Show Collapsible State on 4 Sections with Default HIDE
-  console.log('Test 16: Verify Hide/Show Collapsible State on 4 Sections with Default HIDE...');
+  // 16. Verify Hide/Show Collapsible State on 5 Sections with Default HIDE
+  console.log('Test 16: Verify Hide/Show Collapsible State on 5 Sections with Default HIDE...');
 
   const storyStyleSrc = fs.readFileSync('src/components/StoryStyleSelector.tsx', 'utf8');
   assert.ok(storyStyleSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'StoryStyleSelector must default isExpanded to false (HIDE)');
   assert.ok(storyStyleSrc.includes('ChevronDown'), 'StoryStyleSelector must render chevron indicator');
+
+  const photoStyleSrc = fs.readFileSync('src/components/PhotographicStyleSelector.tsx', 'utf8');
+  assert.ok(photoStyleSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'PhotographicStyleSelector must default isExpanded to false (HIDE)');
+  assert.ok(photoStyleSrc.includes('ChevronDown'), 'PhotographicStyleSelector must render chevron indicator');
 
   const framingSrc = fs.readFileSync('src/components/FramingSelector.tsx', 'utf8');
   assert.ok(framingSrc.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'FramingSelector must default isExpanded to false (HIDE)');
@@ -1650,7 +1654,7 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
   assert.ok(translations.id.expandSection && translations.id.collapseSection, 'id translation must have expandSection and collapseSection');
   assert.ok(translations.en.expandSection && translations.en.collapseSection, 'en translation must have expandSection and collapseSection');
 
-  console.log('✓ Hide/Show Collapsible State verified on all 4 sections with Default HIDE, chevron indicators, and full translation parity.');
+  console.log('✓ Hide/Show Collapsible State verified on all 5 sections with Default HIDE, chevron indicators, and full translation parity.');
 
   console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (16/16) ---');
 }).catch((err) => {

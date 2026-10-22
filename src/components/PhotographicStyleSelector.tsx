@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, Check, Sparkles, X, RotateCcw, Search } from 'lucide-react';
+import { Camera, Check, Sparkles, X, RotateCcw, Search, ChevronDown } from 'lucide-react';
 import { PHOTOGRAPHIC_STYLES, DEFAULT_PHOTOGRAPHIC_STYLES } from '../data/photographicStyles.ts';
 import { PhotographicStyleSelection } from '../types/index.ts';
 import { useLanguage } from '../context/LanguageContext';
@@ -14,6 +14,8 @@ export const PhotographicStyleSelector: React.FC<PhotographicStyleSelectorProps>
   onChange,
 }) => {
   const { t } = useLanguage();
+  // Section collapsed/expanded state (Default: HIDE)
+  const [isExpanded, setIsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const toggleStyle = (name: string) => {
@@ -63,43 +65,105 @@ export const PhotographicStyleSelector: React.FC<PhotographicStyleSelectorProps>
     selection.selected.length > 0 || selection.custom.trim().length > 0;
 
   return (
-    <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+    <section className={`bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm transition-all duration-200 ${isExpanded ? 'space-y-4' : ''}`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-        <div>
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <Camera className="w-4 h-4 text-cyan-400" />
-            {t.photoStyleTitle}
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`flex items-center justify-between gap-3 cursor-pointer select-none group transition ${
+          isExpanded ? 'pb-3 border-b border-slate-800' : ''
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2 group-hover:text-cyan-300 transition-colors">
+              <Camera className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span>{t.photoStyleTitle}</span>
+            </h2>
+            {selection.selected.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                {selection.selected.length} {t.activeStylesLabel || 'Aktif'}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5 truncate sm:whitespace-normal">
             {t.photoStyleSubtitle}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+        <div className="flex items-center gap-2 shrink-0">
+          {isExpanded && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="hidden sm:flex items-center gap-2"
+            >
+              <button
+                type="button"
+                onClick={handleResetDefault}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition"
+                title="Reset Photographic Styles to default state"
+              >
+                <RotateCcw className="w-3 h-3 text-cyan-400" />
+                {t.resetPhotoStyles || 'Reset Default'}
+              </button>
+              {hasSelections && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-800 rounded-lg transition"
+                >
+                  <X className="w-3 h-3" />
+                  {t.clearPhotoStyles}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Expand/Collapse Button */}
           <button
             type="button"
-            onClick={handleResetDefault}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition"
-            title="Reset Photographic Styles to default state"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            aria-expanded={isExpanded}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition group-hover:border-slate-600"
           >
-            <RotateCcw className="w-3 h-3 text-cyan-400" />
-            {t.resetPhotoStyles || 'Reset Default'}
+            <span className="hidden sm:inline">{isExpanded ? t.collapseSection : t.expandSection}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                isExpanded ? 'rotate-180 text-cyan-400' : ''
+              }`}
+            />
           </button>
-          {hasSelections && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-800 rounded-lg transition"
-            >
-              <X className="w-3 h-3" />
-              {t.clearPhotoStyles}
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Active Tags */}
+      {isExpanded && (
+        <>
+          {/* Mobile Actions Bar */}
+          <div className="flex sm:hidden items-center gap-2 flex-wrap pb-1">
+            <button
+              type="button"
+              onClick={handleResetDefault}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition"
+              title="Reset Photographic Styles to default state"
+            >
+              <RotateCcw className="w-3 h-3 text-cyan-400" />
+              {t.resetPhotoStyles || 'Reset Default'}
+            </button>
+            {hasSelections && (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-800 rounded-lg transition"
+              >
+                <X className="w-3 h-3" />
+                {t.clearPhotoStyles}
+              </button>
+            )}
+          </div>
+
+          {/* Active Tags */}
       {hasSelections && (
         <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-400 font-medium mr-1">{t.activeStylesLabel}</span>
@@ -225,6 +289,8 @@ export const PhotographicStyleSelector: React.FC<PhotographicStyleSelectorProps>
           );
         })}
       </div>
+        </>
+      )}
     </section>
   );
 };
