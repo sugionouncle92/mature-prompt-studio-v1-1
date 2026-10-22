@@ -27,11 +27,11 @@ import { CharacterLocksState, DEFAULT_CHARACTER_LOCKS, CharacterLockPreset } fro
 import { useLanguage } from '../context/LanguageContext';
 import {
   CHARACTER_LOCKS_CONFIG,
-  BUILTIN_CHARACTER_LOCK_PRESETS,
   STORAGE_KEY_CHARACTER_LOCK_PRESETS,
   STORAGE_KEY_ACTIVE_LOCK_PRESET_ID,
+  LEGACY_BUILTIN_PRESET_IDS,
   areLocksEqual,
-  getBuiltinPresetById,
+  filterOutLegacyBuiltinPresets,
 } from '../data/characterLocks.ts';
 
 interface CharacterLocksProps {
@@ -44,15 +44,15 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
   // Section collapsed/expanded state (Default: HIDE)
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Presets State
+  // Presets State — Starts empty by default, strictly migrates out any legacy built-in presets
   const [presets, setPresets] = useState<CharacterLockPreset[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_CHARACTER_LOCK_PRESETS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Verify that all presets have valid 14 lock keys, merging with built-in templates
-          return parsed.map((item) => ({
+          // Filter out legacy built-in presets by isBuiltIn or legacy built-in IDs
+          return filterOutLegacyBuiltinPresets(parsed).map((item) => ({
             ...item,
             locks: {
               ...DEFAULT_CHARACTER_LOCKS,
@@ -62,24 +62,24 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
         }
       }
     } catch {
-      // fallback to built-in presets
+      // fallback to empty list
     }
-    return BUILTIN_CHARACTER_LOCK_PRESETS;
+    return [];
   });
 
-  const [activePresetId, setActivePresetId] = useState<string>(() => {
+  const [activePresetId, setActivePresetId] = useState<string | null>(() => {
     try {
       const savedId = localStorage.getItem(STORAGE_KEY_ACTIVE_LOCK_PRESET_ID);
-      if (savedId) {
+      if (savedId && !LEGACY_BUILTIN_PRESET_IDS.has(savedId)) {
         return savedId;
       }
     } catch {
       // fallback
     }
-    return BUILTIN_CHARACTER_LOCK_PRESETS[0].id;
+    return null;
   });
 
-  const [selectedDropdownPresetId, setSelectedDropdownPresetId] = useState<string>(activePresetId);
+  const [selectedDropdownPresetId, setSelectedDropdownPresetId] = useState<string>(activePresetId || '');
 
   // Save presets to localStorage whenever updated
   useEffect(() => {
@@ -93,16 +93,26 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
   // Save active preset ID whenever changed
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_LOCK_PRESET_ID, activePresetId);
+      if (activePresetId) {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_LOCK_PRESET_ID, activePresetId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_LOCK_PRESET_ID);
+      }
     } catch {
       // ignore
     }
   }, [activePresetId]);
 
-  // Sync selected dropdown when activePresetId changes
+  // Sync selected dropdown when activePresetId or presets change
   useEffect(() => {
-    setSelectedDropdownPresetId(activePresetId);
-  }, [activePresetId]);
+    if (activePresetId && presets.some((p) => p.id === activePresetId)) {
+      setSelectedDropdownPresetId(activePresetId);
+    } else if (presets.length > 0) {
+      setSelectedDropdownPresetId(presets[0].id);
+    } else {
+      setSelectedDropdownPresetId('');
+    }
+  }, [activePresetId, presets]);
 
   // Modals state
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
@@ -125,8 +135,9 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
     }, 2800);
   };
 
-  const activePreset = presets.find((p) => p.id === activePresetId) || presets[0];
-  const selectedDropdownPreset = presets.find((p) => p.id === selectedDropdownPresetId) || activePreset;
+  const activePreset = presets.find((p) => p.id === activePresetId) || null;
+  const selectedDropdownPreset =
+    presets.find((p) => p.id === selectedDropdownPresetId) || activePreset || presets[0] || null;
 
   // Check if live locks match active preset
   const isConfigClean = activePreset ? areLocksEqual(locks, activePreset.locks) : false;
@@ -150,7 +161,7 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
     onChange({ ...DEFAULT_CHARACTER_LOCKS });
   };
 
-  // Load a preset by ID and apply all 14 locks explicitly
+  // Load a preset by ID and apply all 14 locks explicitly (both ON and OFF)
   const applyPreset = (presetToLoad: CharacterLockPreset) => {
     const fullLocks: CharacterLocksState = {
       facelock: Boolean(presetToLoad.locks.facelock),
@@ -199,7 +210,7 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
     showNotice(`${t.presetSavedNotice} (${activePreset.name})`);
   };
 
-  // Save As New Preset
+  // Save As New Preset (Manual user creation)
   const handleSaveAsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = newPresetName.trim();
@@ -240,7 +251,6 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
 
   // Delete a user preset
   const handleDeletePreset = (presetToDelete: CharacterLockPreset) => {
-    if (presetToDelete.isBuiltIn) return;
     const confirmed = window.confirm(t.confirmDeletePreset);
     if (!confirmed) return;
 
@@ -248,27 +258,11 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
     setPresets(nextPresets);
 
     if (activePresetId === presetToDelete.id) {
-      const fallbackId = nextPresets[0]?.id || BUILTIN_CHARACTER_LOCK_PRESETS[0].id;
+      const fallbackId = nextPresets[0]?.id || null;
       setActivePresetId(fallbackId);
-      setSelectedDropdownPresetId(fallbackId);
+      setSelectedDropdownPresetId(fallbackId || '');
     }
     showNotice(t.presetDeletedNotice);
-  };
-
-  // Restore built-in preset to original defaults
-  const handleRestoreBuiltin = (presetId: string) => {
-    const original = getBuiltinPresetById(presetId);
-    if (!original) return;
-    const confirmed = window.confirm(t.confirmRestoreBuiltin);
-    if (!confirmed) return;
-
-    const nextPresets = presets.map((p) => (p.id === presetId ? { ...original } : p));
-    setPresets(nextPresets);
-
-    if (activePresetId === presetId) {
-      onChange({ ...original.locks });
-    }
-    showNotice(t.presetRestoredNotice);
   };
 
   // Start editing a preset in manage modal
@@ -340,7 +334,7 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
             <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
               {activeCount} {t.activeLocksCount}
             </span>
-            {/* Active Preset Pill in Header */}
+            {/* Active Preset Pill in Header (Only shown when a preset is loaded) */}
             {activePreset && (
               <span
                 className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition ${
@@ -448,31 +442,40 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
                   <select
                     value={selectedDropdownPresetId}
                     onChange={(e) => setSelectedDropdownPresetId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 appearance-none focus:outline-none focus:ring-1 focus:ring-rose-500 hover:border-slate-600 cursor-pointer transition truncate"
+                    disabled={presets.length === 0}
+                    className={`w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 appearance-none focus:outline-none focus:ring-1 focus:ring-rose-500 hover:border-slate-600 transition truncate ${
+                      presets.length === 0 ? 'opacity-60 cursor-not-allowed text-slate-400' : 'cursor-pointer'
+                    }`}
                   >
-                    {presets.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {p.isBuiltIn ? `[${t.builtInBadge}]` : `[${t.customBadge}]`}
-                      </option>
-                    ))}
+                    {presets.length === 0 ? (
+                      <option value="">{t.emptyPresetsTitle}</option>
+                    ) : (
+                      presets.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
-                {/* Status Indicator Badge */}
-                <div className="shrink-0 flex items-center">
-                  {isConfigClean ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/50 text-emerald-300 border border-emerald-800/60 shadow-sm">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>{t.presetSavedStatus}</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-950/50 text-amber-300 border border-amber-800/60 shadow-sm">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
-                      <span>{t.presetModifiedStatus}</span>
-                    </span>
-                  )}
-                </div>
+                {/* Status Indicator Badge (Only shown when active preset exists) */}
+                {activePreset && (
+                  <div className="shrink-0 flex items-center">
+                    {isConfigClean ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/50 text-emerald-300 border border-emerald-800/60 shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{t.presetSavedStatus}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-950/50 text-amber-300 border border-amber-800/60 shadow-sm">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+                        <span>{t.presetModifiedStatus}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Right: Action Buttons */}
@@ -481,25 +484,35 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
                 <button
                   type="button"
                   onClick={handleLoadSelectedPreset}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 rounded-lg transition active:scale-95 shadow-sm"
-                  title="Terapkan seluruh konfigurasi preset terpilih ke toggle lock"
+                  disabled={!selectedDropdownPreset}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition active:scale-95 shadow-sm ${
+                    selectedDropdownPreset
+                      ? 'text-rose-300 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 hover:border-rose-500/50'
+                      : 'text-slate-500 bg-slate-900 border border-slate-800 opacity-50 cursor-not-allowed'
+                  }`}
+                  title={selectedDropdownPreset ? 'Terapkan seluruh konfigurasi preset terpilih ke toggle lock' : 'Pilih atau buat preset terlebih dahulu'}
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-rose-400" />
+                  <FolderOpen className="w-3.5 h-3.5" />
                   <span>{t.btnLoadPreset}</span>
                 </button>
 
-                {/* Simpan Preset (Update) */}
+                {/* Simpan Preset (Update Active) */}
                 <button
                   type="button"
                   onClick={handleUpdateActivePreset}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg transition active:scale-95 shadow-sm"
-                  title="Perbarui preset aktif dengan kombinasi toggle saat ini"
+                  disabled={!activePreset}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition active:scale-95 shadow-sm ${
+                    activePreset
+                      ? 'text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600'
+                      : 'text-slate-500 bg-slate-900 border border-slate-800 opacity-50 cursor-not-allowed'
+                  }`}
+                  title={activePreset ? 'Perbarui preset aktif dengan kombinasi toggle saat ini' : 'Muat preset terlebih dahulu untuk memperbaruinya'}
                 >
                   <Save className="w-3.5 h-3.5 text-emerald-400" />
                   <span>{t.btnSavePreset}</span>
                 </button>
 
-                {/* Simpan Sebagai... */}
+                {/* Simpan Sebagai... (Always enabled) */}
                 <button
                   type="button"
                   onClick={() => setIsSaveAsModalOpen(true)}
@@ -510,12 +523,12 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
                   <span>{t.btnSaveAsPreset}</span>
                 </button>
 
-                {/* Kelola Preset */}
+                {/* Kelola Preset (Always enabled) */}
                 <button
                   type="button"
                   onClick={() => setIsManageModalOpen(true)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg transition active:scale-95 shadow-sm"
-                  title="Kelola, duplikasi, edit, dan hapus preset"
+                  title="Buka daftar lengkap dan kelola preset"
                 >
                   <Sliders className="w-3.5 h-3.5 text-amber-400" />
                   <span>{t.btnManagePresets}</span>
@@ -523,17 +536,23 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
               </div>
             </div>
 
-            {/* Sub-bar: Active Preset Description & Summary */}
-            {selectedDropdownPreset && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400">
-                <span className="italic leading-relaxed">
-                  {selectedDropdownPreset.description || t.presetDescPlaceholder}
+            {/* Sub-bar: Active Preset Description & Summary OR Empty Helper */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400">
+              {selectedDropdownPreset ? (
+                <>
+                  <span className="italic leading-relaxed">
+                    {selectedDropdownPreset.description || t.presetDescPlaceholder}
+                  </span>
+                  <span className="text-slate-400 font-semibold shrink-0">
+                    {countActiveInPreset(selectedDropdownPreset)}/14 {t.activeLocksSummary}
+                  </span>
+                </>
+              ) : (
+                <span className="italic text-slate-400 leading-relaxed">
+                  {t.emptyPresetsToolbarHint}
                 </span>
-                <span className="text-slate-400 font-semibold shrink-0">
-                  {countActiveInPreset(selectedDropdownPreset)}/14 {t.activeLocksSummary}
-                </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Quick Lock Helpers (Mobile & Secondary) */}
@@ -713,159 +732,164 @@ export const CharacterLocks: React.FC<CharacterLocksProps> = ({ locks, onChange 
               </button>
             </div>
 
-            {/* Presets List */}
+            {/* Presets List or Empty State */}
             <div className="overflow-y-auto py-3 space-y-3 flex-1 pr-1">
-              {presets.map((preset) => {
-                const isPresetActive = preset.id === activePresetId;
-                const isEditingThis = editingPresetId === preset.id;
-                const lockCount = countActiveInPreset(preset);
+              {presets.length === 0 ? (
+                /* Informative Empty State */
+                <div className="py-10 px-4 text-center space-y-3 bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+                    <Bookmark className="w-6 h-6 text-rose-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-white">
+                    {t.emptyPresetsTitle}
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                    {t.emptyPresetsDesc}
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsManageModalOpen(false);
+                        setIsSaveAsModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition shadow-sm active:scale-95"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{t.btnCreateNewPreset}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                presets.map((preset) => {
+                  const isPresetActive = preset.id === activePresetId;
+                  const isEditingThis = editingPresetId === preset.id;
+                  const lockCount = countActiveInPreset(preset);
 
-                return (
-                  <div
-                    key={preset.id}
-                    className={`p-3.5 rounded-xl border transition ${
-                      isPresetActive
-                        ? 'bg-rose-950/20 border-rose-500/40'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    {isEditingThis ? (
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                            {t.presetNameLabel}
-                          </label>
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                            {t.presetDescLabel}
-                          </label>
-                          <input
-                            type="text"
-                            value={editDesc}
-                            onChange={(e) => setEditDesc(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                          />
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingPresetId(null)}
-                            className="px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-slate-800 rounded"
-                          >
-                            {t.btnCancel}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveEditing}
-                            className="px-3 py-1 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded"
-                          >
-                            {t.btnSavePreset}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-white truncate">{preset.name}</span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                preset.isBuiltIn
-                                  ? 'bg-slate-800 text-slate-300 border border-slate-700'
-                                  : 'bg-rose-950/60 text-rose-300 border border-rose-800/60'
-                              }`}
-                            >
-                              {preset.isBuiltIn ? t.builtInBadge : t.customBadge}
-                            </span>
-                            {isPresetActive && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 font-semibold">
-                                {t.presetActiveLabel}
-                              </span>
-                            )}
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              ({lockCount}/14 {t.activeLocksSummary})
-                            </span>
+                  return (
+                    <div
+                      key={preset.id}
+                      className={`p-3.5 rounded-xl border transition ${
+                        isPresetActive
+                          ? 'bg-rose-950/20 border-rose-500/40'
+                          : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {isEditingThis ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              {t.presetNameLabel}
+                            </label>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                            />
                           </div>
-                          {preset.description && (
-                            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                              {preset.description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Actions for this preset */}
-                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                          {/* Muat */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              applyPreset(preset);
-                              setIsManageModalOpen(false);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-300 bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/60 rounded-lg transition"
-                            title="Terapkan preset ini sekarang"
-                          >
-                            <FolderOpen className="w-3 h-3" />
-                            <span>{t.btnLoadPreset}</span>
-                          </button>
-
-                          {/* Duplikasi */}
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicatePreset(preset)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
-                            title="Duplikasi preset ini"
-                          >
-                            <Copy className="w-3 h-3 text-cyan-400" />
-                            <span>{t.btnDuplicatePreset}</span>
-                          </button>
-
-                          {/* Edit */}
-                          <button
-                            type="button"
-                            onClick={() => startEditing(preset)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
-                            title="Edit nama dan deskripsi"
-                          >
-                            <Edit3 className="w-3 h-3 text-amber-400" />
-                          </button>
-
-                          {/* Pulihkan Default for Built-in */}
-                          {preset.isBuiltIn && (
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              {t.presetDescLabel}
+                            </label>
+                            <input
+                              type="text"
+                              value={editDesc}
+                              onChange={(e) => setEditDesc(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                            />
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => handleRestoreBuiltin(preset.id)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-400 hover:text-rose-300 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 rounded-lg transition"
-                              title="Pulihkan konfigurasi preset bawaan ini ke pengaturan pabrik"
+                              onClick={() => setEditingPresetId(null)}
+                              className="px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-slate-800 rounded"
                             >
-                              <RotateCcw className="w-3 h-3 text-rose-400" />
+                              {t.btnCancel}
                             </button>
-                          )}
+                            <button
+                              type="button"
+                              onClick={saveEditing}
+                              className="px-3 py-1 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded"
+                            >
+                              {t.btnSavePreset}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-white truncate">{preset.name}</span>
+                              {isPresetActive && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 font-semibold">
+                                  {t.presetActiveLabel}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-slate-400 font-mono">
+                                ({lockCount}/14 {t.activeLocksSummary})
+                              </span>
+                            </div>
+                            {preset.description && (
+                              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                                {preset.description}
+                              </p>
+                            )}
+                          </div>
 
-                          {/* Hapus for Custom Preset */}
-                          {!preset.isBuiltIn && (
+                          {/* Actions for this user preset */}
+                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                            {/* Muat */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                applyPreset(preset);
+                                setIsManageModalOpen(false);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-300 bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/60 rounded-lg transition"
+                              title="Terapkan preset ini sekarang"
+                            >
+                              <FolderOpen className="w-3 h-3" />
+                              <span>{t.btnLoadPreset}</span>
+                            </button>
+
+                            {/* Duplikasi */}
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicatePreset(preset)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
+                              title="Duplikasi preset ini"
+                            >
+                              <Copy className="w-3 h-3 text-cyan-400" />
+                              <span>{t.btnDuplicatePreset}</span>
+                            </button>
+
+                            {/* Edit */}
+                            <button
+                              type="button"
+                              onClick={() => startEditing(preset)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
+                              title="Edit nama dan deskripsi"
+                            >
+                              <Edit3 className="w-3 h-3 text-amber-400" />
+                            </button>
+
+                            {/* Hapus */}
                             <button
                               type="button"
                               onClick={() => handleDeletePreset(preset)}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-950/40 hover:bg-rose-900/40 border border-rose-800/40 rounded-lg transition"
-                              title="Hapus preset kustom ini"
+                              title="Hapus preset ini"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {/* Modal Footer */}

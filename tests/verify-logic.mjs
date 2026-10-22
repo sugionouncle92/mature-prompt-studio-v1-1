@@ -46,6 +46,8 @@ import {
   STORAGE_KEY_ACTIVE_LOCK_PRESET_ID,
   areLocksEqual,
   getBuiltinPresetById,
+  filterOutLegacyBuiltinPresets,
+  isBuiltinPreset,
 } from '../src/data/characterLocks.ts';
 
 console.log('--- STARTING VERIFICATION TEST SUITE ---');
@@ -1661,63 +1663,100 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   console.log('✓ Hide/Show Collapsible State verified on all 5 sections with Default HIDE, chevron indicators, and full translation parity.');
 }).then(() => {
-  // 17. Verify Character Lock Presets (Catalog, Toggle Completeness, Dirty State, Loading, Storage & UI)
-  console.log('Test 17: Verify Character Lock Presets...');
+  // 17. Verify Empty Initial Preset State & Manual User Preset Management
+  console.log('Test 17: Verify Empty Initial Preset State & Manual User Preset Management...');
 
-  // 17a. Catalog verification
+  // 17a. Verify BUILTIN_CHARACTER_LOCK_PRESETS is empty (no automatic built-in presets)
   assert.ok(Array.isArray(BUILTIN_CHARACTER_LOCK_PRESETS), 'BUILTIN_CHARACTER_LOCK_PRESETS must be an array');
-  assert.ok(BUILTIN_CHARACTER_LOCK_PRESETS.length >= 5, 'Must have at least 5 built-in presets');
+  assert.strictEqual(BUILTIN_CHARACTER_LOCK_PRESETS.length, 0, 'BUILTIN_CHARACTER_LOCK_PRESETS must be empty (0 presets)');
 
-  const presetRealistis = BUILTIN_CHARACTER_LOCK_PRESETS.find(p => p.name.includes('Realistis'));
-  assert.ok(presetRealistis, 'Must contain 01. Realistis preset');
-  assert.strictEqual(presetRealistis.isBuiltIn, true);
+  // 17b. Verify migration filter: strips legacy built-in presets while preserving user-created presets
+  const mixedStoragePresets = [
+    {
+      id: 'preset-01-realistis',
+      name: '01. Realistis',
+      isBuiltIn: true,
+      locks: { ...DEFAULT_CHARACTER_LOCKS },
+    },
+    {
+      id: 'preset-02-anime-to-realis',
+      name: '02. Anime to Realis',
+      isBuiltIn: true,
+      locks: { ...DEFAULT_CHARACTER_LOCKS },
+    },
+    {
+      id: 'preset-custom-user-1',
+      name: '01. Realistis', // User named their own preset "01. Realistis"
+      isBuiltIn: false,
+      locks: { ...DEFAULT_CHARACTER_LOCKS, poselock: true },
+    },
+    {
+      id: 'preset-custom-user-2',
+      name: 'My Studio Setup',
+      isBuiltIn: false,
+      locks: { ...DEFAULT_CHARACTER_LOCKS, outfitlock: true },
+    },
+  ];
 
-  // Exact 14 lock requirements for 01. Realistis:
-  assert.strictEqual(presetRealistis.locks.facelock, true, 'Realistis: /facelock must be ON');
-  assert.strictEqual(presetRealistis.locks.bodyshape, true, 'Realistis: /bodyshape_lock must be ON');
-  assert.strictEqual(presetRealistis.locks.outfitlock, true, 'Realistis: /outfitlock must be ON');
-  assert.strictEqual(presetRealistis.locks.poselock, false, 'Realistis: /poselock must be OFF');
-  assert.strictEqual(presetRealistis.locks.agepreserve, true, 'Realistis: /agepreserve must be ON');
-  assert.strictEqual(presetRealistis.locks.expressionlock, false, 'Realistis: /expressionlock must be OFF');
-  assert.strictEqual(presetRealistis.locks.hairlock, true, 'Realistis: /hairlock must be ON');
-  assert.strictEqual(presetRealistis.locks.bodyproportionlock, true, 'Realistis: /bodyproportionlock must be ON');
-  assert.strictEqual(presetRealistis.locks.anatomylock, true, 'Realistis: /anatomylock must be ON');
-  assert.strictEqual(presetRealistis.locks.poseconsistency, false, 'Realistis: /poseconsistency must be OFF');
-  assert.strictEqual(presetRealistis.locks.perspectivecorrection, false, 'Realistis: /perspectivecorrection must be OFF');
-  assert.strictEqual(presetRealistis.locks.identitylock, true, 'Realistis: /identitylock must be ON');
-  assert.strictEqual(presetRealistis.locks.referencepriority, false, 'Realistis: /referencepriority must be OFF');
-  assert.strictEqual(presetRealistis.locks.facialconsistency, true, 'Realistis: /facial-consistency must be ON');
+  const filtered = filterOutLegacyBuiltinPresets(mixedStoragePresets);
+  assert.strictEqual(filtered.length, 2, 'Must filter out legacy built-in presets and retain only user presets');
+  assert.strictEqual(filtered[0].id, 'preset-custom-user-1', 'Must preserve user preset even if named 01. Realistis');
+  assert.strictEqual(filtered[1].id, 'preset-custom-user-2', 'Must preserve all user custom presets');
 
-  // Exact 14 lock requirements for 02. Anime to Realis:
-  const presetAnime = BUILTIN_CHARACTER_LOCK_PRESETS.find(p => p.name.includes('Anime to Realis'));
-  assert.ok(presetAnime, 'Must contain 02. Anime to Realis preset');
-  assert.strictEqual(presetAnime.locks.facelock, true, 'Anime to Realis: /facelock must be ON');
-  assert.strictEqual(presetAnime.locks.bodyshape, true, 'Anime to Realis: /bodyshape_lock must be ON');
-  assert.strictEqual(presetAnime.locks.outfitlock, true, 'Anime to Realis: /outfitlock must be ON');
-  assert.strictEqual(presetAnime.locks.poselock, true, 'Anime to Realis: /poselock must be ON');
-  assert.strictEqual(presetAnime.locks.agepreserve, true, 'Anime to Realis: /agepreserve must be ON');
-  assert.strictEqual(presetAnime.locks.expressionlock, false, 'Anime to Realis: /expressionlock must be OFF');
-  assert.strictEqual(presetAnime.locks.hairlock, true, 'Anime to Realis: /hairlock must be ON');
-  assert.strictEqual(presetAnime.locks.bodyproportionlock, true, 'Anime to Realis: /bodyproportionlock must be ON');
-  assert.strictEqual(presetAnime.locks.anatomylock, true, 'Anime to Realis: /anatomylock must be ON');
-  assert.strictEqual(presetAnime.locks.poseconsistency, false, 'Anime to Realis: /poseconsistency must be OFF');
-  assert.strictEqual(presetAnime.locks.perspectivecorrection, true, 'Anime to Realis: /perspectivecorrection must be ON');
-  assert.strictEqual(presetAnime.locks.identitylock, true, 'Anime to Realis: /identitylock must be ON');
-  assert.strictEqual(presetAnime.locks.referencepriority, true, 'Anime to Realis: /referencepriority must be ON');
-  assert.strictEqual(presetAnime.locks.facialconsistency, true, 'Anime to Realis: /facial-consistency must be ON');
+  // When no user presets exist in storage, result is empty array
+  const emptyClean = filterOutLegacyBuiltinPresets([
+    { id: 'preset-01-realistis', name: '01. Realistis', isBuiltIn: true, locks: {} },
+  ]);
+  assert.strictEqual(emptyClean.length, 0, 'When only built-ins existed, migration must result in empty array');
 
-  // Verify 03. Identitas Wajah, 04. Outfit & Pose, 05. Default Studio
-  assert.ok(BUILTIN_CHARACTER_LOCK_PRESETS.some(p => p.name.includes('Identitas Wajah')));
-  assert.ok(BUILTIN_CHARACTER_LOCK_PRESETS.some(p => p.name.includes('Outfit & Pose')));
-  assert.ok(BUILTIN_CHARACTER_LOCK_PRESETS.some(p => p.name.includes('Default Studio')));
+  // 17c. Manual user preset creation & full 14-toggle fidelity
+  const manualUserPreset = {
+    id: 'preset-custom-123456789',
+    name: '01. Realistis',
+    description: 'Manual custom preset created by user',
+    isBuiltIn: false,
+    locks: {
+      facelock: true,
+      bodyshape: true,
+      outfitlock: true,
+      poselock: false,
+      agepreserve: true,
+      expressionlock: false,
+      hairlock: true,
+      bodyproportionlock: true,
+      anatomylock: true,
+      poseconsistency: false,
+      perspectivecorrection: false,
+      identitylock: true,
+      referencepriority: false,
+      facialconsistency: true,
+    },
+    updatedAt: Date.now(),
+  };
 
-  // 17b. Equality & Dirty State Checking (areLocksEqual)
-  const cloneLocks = { ...presetRealistis.locks };
-  assert.strictEqual(areLocksEqual(presetRealistis.locks, cloneLocks), true, 'Identical locks must be equal');
+  // Verify all 14 locks stored with exact fidelity
+  assert.strictEqual(manualUserPreset.locks.facelock, true);
+  assert.strictEqual(manualUserPreset.locks.bodyshape, true);
+  assert.strictEqual(manualUserPreset.locks.outfitlock, true);
+  assert.strictEqual(manualUserPreset.locks.poselock, false);
+  assert.strictEqual(manualUserPreset.locks.agepreserve, true);
+  assert.strictEqual(manualUserPreset.locks.expressionlock, false);
+  assert.strictEqual(manualUserPreset.locks.hairlock, true);
+  assert.strictEqual(manualUserPreset.locks.bodyproportionlock, true);
+  assert.strictEqual(manualUserPreset.locks.anatomylock, true);
+  assert.strictEqual(manualUserPreset.locks.poseconsistency, false);
+  assert.strictEqual(manualUserPreset.locks.perspectivecorrection, false);
+  assert.strictEqual(manualUserPreset.locks.identitylock, true);
+  assert.strictEqual(manualUserPreset.locks.referencepriority, false);
+  assert.strictEqual(manualUserPreset.locks.facialconsistency, true);
+
+  // 17d. Equality & Dirty State Checking (areLocksEqual)
+  const cloneLocks = { ...manualUserPreset.locks };
+  assert.strictEqual(areLocksEqual(manualUserPreset.locks, cloneLocks), true, 'Identical locks must be equal');
   const dirtyLocks = { ...cloneLocks, poselock: true };
-  assert.strictEqual(areLocksEqual(presetRealistis.locks, dirtyLocks), false, 'Changing any lock must trigger dirty state');
+  assert.strictEqual(areLocksEqual(manualUserPreset.locks, dirtyLocks), false, 'Changing any lock must trigger dirty state');
 
-  // 17c. Full 14-toggle application on Load (including OFF locks)
+  // 17e. Full 14-toggle application on Load (including OFF locks)
   const allTrueLocks = {
     facelock: true,
     bodyshape: true,
@@ -1734,62 +1773,60 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
     referencepriority: true,
     facialconsistency: true,
   };
-  const loadedFromRealistis = {
-    facelock: Boolean(presetRealistis.locks.facelock),
-    bodyshape: Boolean(presetRealistis.locks.bodyshape),
-    outfitlock: Boolean(presetRealistis.locks.outfitlock),
-    poselock: Boolean(presetRealistis.locks.poselock),
-    agepreserve: Boolean(presetRealistis.locks.agepreserve),
-    expressionlock: Boolean(presetRealistis.locks.expressionlock),
-    hairlock: Boolean(presetRealistis.locks.hairlock),
-    bodyproportionlock: Boolean(presetRealistis.locks.bodyproportionlock),
-    anatomylock: Boolean(presetRealistis.locks.anatomylock),
-    poseconsistency: Boolean(presetRealistis.locks.poseconsistency),
-    perspectivecorrection: Boolean(presetRealistis.locks.perspectivecorrection),
-    identitylock: Boolean(presetRealistis.locks.identitylock),
-    referencepriority: Boolean(presetRealistis.locks.referencepriority),
-    facialconsistency: Boolean(presetRealistis.locks.facialconsistency),
+  const loadedFromManual = {
+    facelock: Boolean(manualUserPreset.locks.facelock),
+    bodyshape: Boolean(manualUserPreset.locks.bodyshape),
+    outfitlock: Boolean(manualUserPreset.locks.outfitlock),
+    poselock: Boolean(manualUserPreset.locks.poselock),
+    agepreserve: Boolean(manualUserPreset.locks.agepreserve),
+    expressionlock: Boolean(manualUserPreset.locks.expressionlock),
+    hairlock: Boolean(manualUserPreset.locks.hairlock),
+    bodyproportionlock: Boolean(manualUserPreset.locks.bodyproportionlock),
+    anatomylock: Boolean(manualUserPreset.locks.anatomylock),
+    poseconsistency: Boolean(manualUserPreset.locks.poseconsistency),
+    perspectivecorrection: Boolean(manualUserPreset.locks.perspectivecorrection),
+    identitylock: Boolean(manualUserPreset.locks.identitylock),
+    referencepriority: Boolean(manualUserPreset.locks.referencepriority),
+    facialconsistency: Boolean(manualUserPreset.locks.facialconsistency),
   };
-  assert.strictEqual(loadedFromRealistis.poselock, false, 'Loading Realistis must turn poselock OFF');
-  assert.strictEqual(loadedFromRealistis.expressionlock, false, 'Loading Realistis must turn expressionlock OFF');
-  assert.strictEqual(loadedFromRealistis.poseconsistency, false, 'Loading Realistis must turn poseconsistency OFF');
-  assert.strictEqual(loadedFromRealistis.perspectivecorrection, false, 'Loading Realistis must turn perspectivecorrection OFF');
-  assert.strictEqual(loadedFromRealistis.referencepriority, false, 'Loading Realistis must turn referencepriority OFF');
-  assert.strictEqual(loadedFromRealistis.outfitlock, true, 'Loading Realistis must keep outfitlock ON');
+  assert.strictEqual(loadedFromManual.poselock, false, 'Loading must turn poselock OFF');
+  assert.strictEqual(loadedFromManual.expressionlock, false, 'Loading must turn expressionlock OFF');
+  assert.strictEqual(loadedFromManual.poseconsistency, false, 'Loading must turn poseconsistency OFF');
+  assert.strictEqual(loadedFromManual.perspectivecorrection, false, 'Loading must turn perspectivecorrection OFF');
+  assert.strictEqual(loadedFromManual.referencepriority, false, 'Loading must turn referencepriority OFF');
+  assert.strictEqual(loadedFromManual.outfitlock, true, 'Loading must keep outfitlock ON');
 
-  // 17d. Prompt Generator Integration with Presets
+  // 17f. Prompt Generator Integration with Manual Presets
   const testBasePrompt = 'A portrait of an adult woman in a luxury penthouse at night --ar 9:16';
-  const promptFromRealistis = integrateActiveShorthandsIntoPrompt(testBasePrompt, presetRealistis.locks, {
+  const promptFromManual = integrateActiveShorthandsIntoPrompt(testBasePrompt, manualUserPreset.locks, {
     hasFaceReference: true,
   });
 
   // Active locks must be included
-  assert.ok(promptFromRealistis.includes('Face Identity Lock:'), 'Must include Face Identity Lock directive');
-  assert.ok(promptFromRealistis.includes('Body & Proportion Lock:'), 'Must include Body & Proportion Lock directive');
-  assert.ok(promptFromRealistis.includes('Outfit Lock:'), 'Must include Outfit Lock directive');
-  assert.ok(promptFromRealistis.includes('Hair Lock:'), 'Must include Hair Lock directive');
-  assert.ok(promptFromRealistis.includes('Anatomy Lock:'), 'Must include Anatomy Lock directive');
+  assert.ok(promptFromManual.includes('Face Identity Lock:'), 'Must include Face Identity Lock directive');
+  assert.ok(promptFromManual.includes('Body & Proportion Lock:'), 'Must include Body & Proportion Lock directive');
+  assert.ok(promptFromManual.includes('Outfit Lock:'), 'Must include Outfit Lock directive');
+  assert.ok(promptFromManual.includes('Hair Lock:'), 'Must include Hair Lock directive');
+  assert.ok(promptFromManual.includes('Anatomy Lock:'), 'Must include Anatomy Lock directive');
 
   // Inactive locks must NOT be included
-  assert.ok(!promptFromRealistis.includes('Pose Lock:'), 'Must NOT include Pose Lock directive when poselock is OFF');
-  assert.ok(!promptFromRealistis.includes('Expression Lock:'), 'Must NOT include Expression Lock directive when expressionlock is OFF');
-  assert.ok(!promptFromRealistis.includes('Pose Consistency Lock:'), 'Must NOT include Pose Consistency Lock directive when poseconsistency is OFF');
-  assert.ok(!promptFromRealistis.includes('Perspective Correction Lock:'), 'Must NOT include Perspective Correction Lock directive when perspectivecorrection is OFF');
-  assert.ok(!promptFromRealistis.includes('Reference Priority:'), 'Must NOT include Reference Priority directive when referencepriority is OFF');
+  assert.ok(!promptFromManual.includes('Pose Lock:'), 'Must NOT include Pose Lock directive when poselock is OFF');
+  assert.ok(!promptFromManual.includes('Expression Lock:'), 'Must NOT include Expression Lock directive when expressionlock is OFF');
+  assert.ok(!promptFromManual.includes('Pose Consistency Lock:'), 'Must NOT include Pose Consistency Lock directive when poseconsistency is OFF');
+  assert.ok(!promptFromManual.includes('Perspective Correction Lock:'), 'Must NOT include Perspective Correction Lock directive when perspectivecorrection is OFF');
+  assert.ok(!promptFromManual.includes('Reference Priority:'), 'Must NOT include Reference Priority directive when referencepriority is OFF');
 
-  // 17e. Storage Keys & Built-in Restore Helper
+  // 17g. Storage Keys
   assert.strictEqual(STORAGE_KEY_CHARACTER_LOCK_PRESETS, 'mature_prompt_studio_lock_presets_v1');
   assert.strictEqual(STORAGE_KEY_ACTIVE_LOCK_PRESET_ID, 'mature_prompt_studio_active_preset_id_v1');
-  const restored = getBuiltinPresetById('preset-01-realistis');
-  assert.ok(restored && restored.name === '01. Realistis');
 
-  // 17f. UI Structure & Components in CharacterLocks.tsx
+  // 17h. UI Structure & Empty State in CharacterLocks.tsx
   const charLocksCode = fs.readFileSync('src/components/CharacterLocks.tsx', 'utf8');
-  assert.ok(charLocksCode.includes('STORAGE_KEY_CHARACTER_LOCK_PRESETS'), 'Must use STORAGE_KEY_CHARACTER_LOCK_PRESETS');
-  assert.ok(charLocksCode.includes('STORAGE_KEY_ACTIVE_LOCK_PRESET_ID'), 'Must use STORAGE_KEY_ACTIVE_LOCK_PRESET_ID');
+  assert.ok(charLocksCode.includes('filterOutLegacyBuiltinPresets'), 'Must use filterOutLegacyBuiltinPresets on load');
+  assert.ok(charLocksCode.includes('t.emptyPresetsTitle'), 'Must render emptyPresetsTitle');
+  assert.ok(charLocksCode.includes('t.emptyPresetsDesc'), 'Must render emptyPresetsDesc');
+  assert.ok(charLocksCode.includes('t.btnCreateNewPreset'), 'Must provide btnCreateNewPreset button');
   assert.ok(charLocksCode.includes('t.presetActiveLabel'), 'Must display active preset label');
-  assert.ok(charLocksCode.includes('t.presetSavedStatus'), 'Must display preset saved status');
-  assert.ok(charLocksCode.includes('t.presetModifiedStatus'), 'Must display preset modified status');
   assert.ok(charLocksCode.includes('t.btnLoadPreset'), 'Must provide load preset button');
   assert.ok(charLocksCode.includes('t.btnSavePreset'), 'Must provide save preset button');
   assert.ok(charLocksCode.includes('t.btnSaveAsPreset'), 'Must provide save as preset button');
@@ -1798,7 +1835,12 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
   assert.ok(charLocksCode.includes('t.modalManagePresetsTitle'), 'Must contain Manage Presets modal');
   assert.ok(charLocksCode.includes('const [isExpanded, setIsExpanded] = useState(false);'), 'Must preserve default HIDE');
 
-  console.log('✓ Character Lock Presets verified: Catalog (5 presets, 01. Realistis, 02. Anime to Realis), dirty check, 14-toggle fidelity on load, prompt generator integration, persistence, and responsive UI.');
+  // 17i. Translation empty state strings
+  assert.strictEqual(translations.id.emptyPresetsTitle, 'Belum ada preset tersimpan.');
+  assert.ok(translations.id.emptyPresetsDesc.includes('Buat preset sendiri'));
+  assert.strictEqual(translations.en.emptyPresetsTitle, 'No saved presets yet.');
+
+  console.log('✓ Character Lock Presets verified: Empty initial state, zero built-ins, clean migration, manual user creation, 14-toggle fidelity, prompt generator integration, and responsive UI.');
 
   console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (17/17) ---');
 }).catch((err) => {

@@ -238,6 +238,9 @@ export const translations = {
     presetRestoredNotice: 'Preset berhasil dipulihkan ke default.',
     presetDeletedNotice: 'Preset berhasil dihapus.',
     selectPresetPlaceholder: 'Pilih Preset...',
+    emptyPresetsTitle: 'Belum ada preset tersimpan.',
+    emptyPresetsDesc: 'Buat preset sendiri dengan mengatur toggle Character Locks sesuai kebutuhan, lalu pilih Buat Preset Baru.',
+    emptyPresetsToolbarHint: 'Belum ada preset tersimpan. Atur toggle pengunci karakter di bawah lalu klik "Simpan Sebagai" untuk membuat preset.',
 
     // Variation Settings
     variationTitle: 'Variation Settings — True Scene Variations',
@@ -594,6 +597,9 @@ export const translations = {
     presetRestoredNotice: 'Preset restored to factory default.',
     presetDeletedNotice: 'Preset deleted successfully.',
     selectPresetPlaceholder: 'Select Preset...',
+    emptyPresetsTitle: 'No saved presets yet.',
+    emptyPresetsDesc: 'Create your own presets by configuring the Character Locks toggles as needed, then select Create New Preset.',
+    emptyPresetsToolbarHint: 'No saved presets yet. Configure character locks below then click "Save As" to create a preset.',
 
     // Variation Settings
     variationTitle: 'Variation Settings — True Scene Variations',
