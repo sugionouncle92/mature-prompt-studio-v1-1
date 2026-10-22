@@ -59,7 +59,7 @@ export interface CharacterLocksState {
 export const DEFAULT_CHARACTER_LOCKS: CharacterLocksState = {
   facelock: true,
   bodyshape: true,
-  outfitlock: true,
+  outfitlock: false,
   poselock: false,
   agepreserve: true,
   expressionlock: false,

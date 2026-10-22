@@ -132,10 +132,11 @@ export const PHOTOGRAPHIC_STYLES: PhotographicStyleItem[] = [
 
 /**
  * Default Photographic Styles selected on initial application load or reset.
- * All 4 new shorthand styles are DEFAULT ON, while preserving the legacy 'Ultra Realistic'.
+ * All 5 visual rendering styles active per reference:
+ * Nyata, Photorealism, Maximum Detail, Natural Skin Texture, Anti-AI Artifacts.
  */
 export const DEFAULT_PHOTOGRAPHIC_STYLES: string[] = [
-  'Ultra Realistic',
+  'Nyata',
   'Photorealism',
   'Maximum Detail',
   'Natural Skin Texture',

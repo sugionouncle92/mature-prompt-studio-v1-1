@@ -1241,7 +1241,7 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   assert.strictEqual(defaultLocks.facelock, true, '/facelock must be ON by default');
   assert.strictEqual(defaultLocks.bodyshape, true, '/bodyshape_lock must be ON by default');
-  assert.strictEqual(defaultLocks.outfitlock, true, '/outfitlock must be ON by default');
+  assert.strictEqual(defaultLocks.outfitlock, false, '/outfitlock must be OFF by default');
   assert.strictEqual(defaultLocks.poselock, false, '/poselock must be OFF by default');
   assert.strictEqual(defaultLocks.agepreserve, true, '/agepreserve must be ON by default');
   assert.strictEqual(defaultLocks.expressionlock, false, '/expressionlock must be OFF by default');
@@ -1256,7 +1256,7 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   // Total active in default state
   const defaultActiveCount = Object.values(defaultLocks).filter(Boolean).length;
-  assert.strictEqual(defaultActiveCount, 12, 'Default configuration must have exactly 12 active locks (poselock & expressionlock retained but OFF, 3 new locks ON)');
+  assert.strictEqual(defaultActiveCount, 11, 'Default configuration must have exactly 11 active locks (outfitlock, poselock & expressionlock OFF, 11 locks ON)');
 
   // 11c. Verify System Instruction & User Prompt Builder with new locks
   const service = GeminiService.getInstance();
@@ -1547,9 +1547,9 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
     assert.ok(DEFAULT_PHOTOGRAPHIC_STYLES.includes(item.name), `Style "${item.name}" must be in DEFAULT_PHOTOGRAPHIC_STYLES`);
   }
 
-  // Legacy 'Ultra Realistic' is preserved in default styles
-  assert.ok(DEFAULT_PHOTOGRAPHIC_STYLES.includes('Ultra Realistic'), 'DEFAULT_PHOTOGRAPHIC_STYLES must retain Ultra Realistic');
-  assert.strictEqual(DEFAULT_PHOTOGRAPHIC_STYLES.length, 5, 'DEFAULT_PHOTOGRAPHIC_STYLES must have 5 items (Ultra Realistic + 4 new shorthands)');
+  // 'Nyata' is active in default styles per reference
+  assert.ok(DEFAULT_PHOTOGRAPHIC_STYLES.includes('Nyata'), 'DEFAULT_PHOTOGRAPHIC_STYLES must retain Nyata');
+  assert.strictEqual(DEFAULT_PHOTOGRAPHIC_STYLES.length, 5, 'DEFAULT_PHOTOGRAPHIC_STYLES must have 5 items (Nyata + 4 new shorthands)');
 
   // 15c. Independent Toggleability & Persistence
   // Can turn off identitylock and photorealism independently
