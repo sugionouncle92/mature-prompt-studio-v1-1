@@ -56,6 +56,15 @@ export interface CharacterLocksState {
   facialconsistency: boolean; // /facial-consistency
 }
 
+export interface CharacterLockPreset {
+  id: string;
+  name: string;
+  description?: string;
+  isBuiltIn?: boolean;
+  locks: CharacterLocksState;
+  updatedAt?: number;
+}
+
 export const DEFAULT_CHARACTER_LOCKS: CharacterLocksState = {
   facelock: true,
   bodyshape: true,

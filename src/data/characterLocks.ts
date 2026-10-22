@@ -1,4 +1,4 @@
-import type { CharacterLocksState } from '../types/index.ts';
+import type { CharacterLocksState, CharacterLockPreset } from '../types/index.ts';
 
 export interface CharacterLockItem {
   key: keyof CharacterLocksState;
@@ -533,3 +533,160 @@ export function integrateActiveShorthandsIntoPrompt(
 
   return trailingAr ? `${combined} ${trailingAr}` : combined;
 }
+
+export const STORAGE_KEY_CHARACTER_LOCK_PRESETS = 'mature_prompt_studio_lock_presets_v1';
+export const STORAGE_KEY_ACTIVE_LOCK_PRESET_ID = 'mature_prompt_studio_active_preset_id_v1';
+
+/**
+ * Built-in standard configuration presets for Character Locks.
+ * These act as reference templates that can be loaded, customized, or restored to defaults.
+ */
+export const BUILTIN_CHARACTER_LOCK_PRESETS: CharacterLockPreset[] = [
+  {
+    id: 'preset-01-realistis',
+    name: '01. Realistis',
+    description: 'Mempertahankan identitas dan penampilan karakter agar hasil gambar fotorealistis tetap konsisten.',
+    isBuiltIn: true,
+    locks: {
+      facelock: true,
+      bodyshape: true,
+      outfitlock: true,
+      poselock: false,
+      agepreserve: true,
+      expressionlock: false,
+      hairlock: true,
+      bodyproportionlock: true,
+      anatomylock: true,
+      poseconsistency: false,
+      perspectivecorrection: false,
+      identitylock: true,
+      referencepriority: false,
+      facialconsistency: true,
+    },
+    updatedAt: 1700000000000,
+  },
+  {
+    id: 'preset-02-anime-to-realis',
+    name: '02. Anime to Realis',
+    description: 'Mengubah karakter anime menjadi manusia fotorealistis sambil mempertahankan ciri khas karakter yang relevan.',
+    isBuiltIn: true,
+    locks: {
+      facelock: true,
+      bodyshape: true,
+      outfitlock: true,
+      poselock: true,
+      agepreserve: true,
+      expressionlock: false,
+      hairlock: true,
+      bodyproportionlock: true,
+      anatomylock: true,
+      poseconsistency: false,
+      perspectivecorrection: true,
+      identitylock: true,
+      referencepriority: true,
+      facialconsistency: true,
+    },
+    updatedAt: 1700000000000,
+  },
+  {
+    id: 'preset-03-identitas-wajah',
+    name: '03. Identitas Wajah',
+    description: 'Fokus mengunci identitas wajah, usia, dan rambut subjek dengan kebebasan penuh pada pose, busana, dan anatomi.',
+    isBuiltIn: true,
+    locks: {
+      facelock: true,
+      bodyshape: false,
+      outfitlock: false,
+      poselock: false,
+      agepreserve: true,
+      expressionlock: false,
+      hairlock: true,
+      bodyproportionlock: false,
+      anatomylock: false,
+      poseconsistency: false,
+      perspectivecorrection: false,
+      identitylock: true,
+      referencepriority: true,
+      facialconsistency: true,
+    },
+    updatedAt: 1700000000000,
+  },
+  {
+    id: 'preset-04-outfit-pose',
+    name: '04. Outfit & Pose',
+    description: 'Mengunci busana, postur tubuh, dan sudut pandang secara ketat untuk variasi pencahayaan atau latar belakang.',
+    isBuiltIn: true,
+    locks: {
+      facelock: false,
+      bodyshape: true,
+      outfitlock: true,
+      poselock: true,
+      agepreserve: false,
+      expressionlock: false,
+      hairlock: false,
+      bodyproportionlock: true,
+      anatomylock: true,
+      poseconsistency: true,
+      perspectivecorrection: true,
+      identitylock: false,
+      referencepriority: false,
+      facialconsistency: false,
+    },
+    updatedAt: 1700000000000,
+  },
+  {
+    id: 'preset-05-default',
+    name: '05. Default Studio',
+    description: 'Konfigurasi standar bawaan Mature Prompt Studio (11 lock aktif, 3 nonaktif).',
+    isBuiltIn: true,
+    locks: {
+      facelock: true,
+      bodyshape: true,
+      outfitlock: false,
+      poselock: false,
+      agepreserve: true,
+      expressionlock: false,
+      hairlock: true,
+      bodyproportionlock: true,
+      anatomylock: true,
+      poseconsistency: true,
+      perspectivecorrection: true,
+      identitylock: true,
+      referencepriority: true,
+      facialconsistency: true,
+    },
+    updatedAt: 1700000000000,
+  },
+];
+
+/**
+ * Checks whether two CharacterLocksState objects have identical toggle values across all 14 locks.
+ */
+export function areLocksEqual(a?: CharacterLocksState | null, b?: CharacterLocksState | null): boolean {
+  if (!a || !b) return false;
+  const lockKeys: (keyof CharacterLocksState)[] = [
+    'facelock',
+    'bodyshape',
+    'outfitlock',
+    'poselock',
+    'agepreserve',
+    'expressionlock',
+    'hairlock',
+    'bodyproportionlock',
+    'anatomylock',
+    'poseconsistency',
+    'perspectivecorrection',
+    'identitylock',
+    'referencepriority',
+    'facialconsistency',
+  ];
+  return lockKeys.every((k) => Boolean(a[k]) === Boolean(b[k]));
+}
+
+/**
+ * Finds built-in preset template by its ID.
+ */
+export function getBuiltinPresetById(id: string): CharacterLockPreset | undefined {
+  return BUILTIN_CHARACTER_LOCK_PRESETS.find((p) => p.id === id);
+}
+
