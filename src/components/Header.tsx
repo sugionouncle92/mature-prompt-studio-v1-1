@@ -73,13 +73,13 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Download APK Pill */}
           <a
-            href="./mature-prompt-studio-v1.0.0.apk"
-            download="mature-prompt-studio-v1.0.0.apk"
+            href="./mature-prompt-studio-v1.1.0.apk"
+            download="mature-prompt-studio-v1.1.0.apk"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/40 transition shadow-sm"
-            title="Download Android Release APK (v1.0.0)"
+            title="Download Android Release APK (v1.1.0)"
           >
             <span>📱 APK</span>
-            <span className="hidden sm:inline">Release</span>
+            <span className="hidden sm:inline">Release v1.1</span>
           </a>
 
           {/* Connection Pill */}
