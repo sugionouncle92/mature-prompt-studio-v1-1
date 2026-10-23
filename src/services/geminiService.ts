@@ -1,4 +1,4 @@
-import type { GenerationInput, PromptResult, OutfitFidelityCheck, PromptRepairSummary } from '../types/index.ts';
+import type { GenerationInput, PromptResult, OutfitFidelityCheck, PromptRepairSummary, CustomCharacterLock } from '../types/index.ts';
 import {
   getStyleVisualDirective,
   getMatureSubstyleByName,
@@ -335,8 +335,13 @@ export class GeminiService {
       })
     );
 
+    const activeCustomTags = (input.customLocks || [])
+      .filter((l) => l && l.enabled && l.shorthand && l.shorthand.trim())
+      .map((l) => l.shorthand.trim());
+
     const activeLockTags = [
       ...getActiveLockTags(input.characterLocks),
+      ...activeCustomTags,
       ...getActivePhotographicShorthands(input.photographicStyle.selected),
     ];
 
@@ -1176,7 +1181,7 @@ PRIORITY OF SOURCES & CONFLICT RESOLUTION:
 
 CHARACTER LOCKS ENFORCEMENT:
 Treat all active locks as hard prompt constraints:
-${this.buildLocksInstruction(input.characterLocks)}
+${this.buildLocksInstruction(input.characterLocks, input.customLocks)}
 
 VARIATIONS DIVERSITY:
 - Each variation must create meaningful differences through actions, gestures, emotional beats, character interaction, timing, environmental blocking, and composition.
@@ -1184,7 +1189,10 @@ VARIATIONS DIVERSITY:
 - Maintain core identity, active locks, and selected Story Style consistently across all variations.`;
   }
 
-  private buildLocksInstruction(locks: GenerationInput['characterLocks']): string {
+  private buildLocksInstruction(
+    locks: GenerationInput['characterLocks'],
+    customLocks?: CustomCharacterLock[]
+  ): string {
     const active = CHARACTER_LOCKS_CONFIG
       .filter((item) => Boolean(locks[item.key]))
       .map((item) => {
@@ -1193,6 +1201,15 @@ VARIATIONS DIVERSITY:
         }
         return `- ${item.tag}: ${item.promptInstruction}`;
       });
+
+    if (Array.isArray(customLocks)) {
+      const activeCustom = customLocks.filter(
+        (l) => l && l.enabled && l.instruction && l.instruction.trim()
+      );
+      for (const cl of activeCustom) {
+        active.push(`- ${cl.shorthand} (${cl.name}): ${cl.instruction.trim()}`);
+      }
+    }
 
     if (active.length === 0) {
       return "No character locks active. Subtle natural variations in pose, clothing, and expression are permitted.";
@@ -1341,9 +1358,14 @@ VARIATIONS DIVERSITY:
 
     // Active Locks
     const activeLockTags = getActiveLockTags(input.characterLocks);
+    const activeCustomTags = (input.customLocks || [])
+      .filter((l) => l && l.enabled && l.shorthand && l.shorthand.trim())
+      .map((l) => l.shorthand.trim());
 
-    if (activeLockTags.length > 0) {
-      parts.push(`\n[ACTIVE CHARACTER LOCKS - HARD CONSTRAINTS]:\n${activeLockTags.join(' ')}\nEnforce these locks strictly. Append the active lock flags to the prompt only if helpful for external generator tags, but above all integrate their hard constraints into the visual scene description.`);
+    const allActiveTags = [...activeLockTags, ...activeCustomTags];
+
+    if (allActiveTags.length > 0) {
+      parts.push(`\n[ACTIVE CHARACTER LOCKS - HARD CONSTRAINTS]:\n${allActiveTags.join(' ')}\nEnforce these locks strictly. Append the active lock flags to the prompt only if helpful for external generator tags, but above all integrate their hard constraints into the visual scene description.`);
     }
 
     // Aspect Ratio in User Prompt

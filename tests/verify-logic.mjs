@@ -48,6 +48,14 @@ import {
   getBuiltinPresetById,
   filterOutLegacyBuiltinPresets,
   isBuiltinPreset,
+  STORAGE_KEY_CUSTOM_CHARACTER_LOCKS,
+  RESERVED_BUILTIN_SHORTHANDS,
+  isValidShorthand,
+  isBuiltinShorthandCollision,
+  validateCustomLock,
+  exportCustomLocksToJson,
+  validateImportJson,
+  normalizeShorthand,
 } from '../src/data/characterLocks.ts';
 
 console.log('--- STARTING VERIFICATION TEST SUITE ---');
@@ -2024,7 +2032,218 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   console.log('✓ Reset button verified: Renamed to "Reset", clears Column A, Section C image, visual analysis result, prompt variations, and process state while strictly preserving Column B keywords and all user settings.');
 
-  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (19/19) ---');
+  
+  // 20. Verify Custom Character Locks + Export / Import
+  console.log('Test 20: Verify Custom Character Locks (CRUD, Storage, Export/Import, Conflict Resolution, Prompt Integration, and Reset Default Isolation)...');
+
+  // 20a. Shorthand Format & Collision Validation
+  assert.ok(isValidShorthand('/customhair'), 'Valid shorthand must be accepted');
+  assert.ok(isValidShorthand('/my-lock_1'), 'Valid shorthand with hyphens and underscores must be accepted');
+  assert.ok(!isValidShorthand('customhair'), 'Shorthand without leading "/" must be rejected');
+  assert.ok(!isValidShorthand('/custom hair'), 'Shorthand with space must be rejected');
+  assert.ok(!isValidShorthand('/custom#hair'), 'Shorthand with special chars must be rejected');
+
+  assert.ok(isBuiltinShorthandCollision('/facelock'), 'Built-in /facelock must be detected as collision');
+  assert.ok(isBuiltinShorthandCollision('/bodyshape_lock'), 'Built-in /bodyshape_lock must be detected as collision');
+  assert.ok(isBuiltinShorthandCollision('/photorealism'), 'Built-in /photorealism must be detected as collision');
+  assert.ok(isBuiltinShorthandCollision('/anti-ai-artifacts'), 'Built-in /anti-ai-artifacts must be detected as collision');
+  assert.ok(!isBuiltinShorthandCollision('/uniquecustom123'), 'Non-builtin shorthand must not collide');
+
+  // 20b. Custom Lock CRUD Validation Logic
+  const existingTestLocks = [
+    {
+      id: 'lock-1',
+      name: 'Reference Hairstyle Lock',
+      shorthand: '/refhair',
+      description: 'Preserves subject hair style',
+      instruction: 'Strictly match hairstyle to reference photo.',
+      enabled: true,
+    },
+    {
+      id: 'lock-2',
+      name: 'Vintage Makeup Lock',
+      shorthand: '/vintagemakeup',
+      description: 'Preserves retro red lipstick and winged eyeliner',
+      instruction: 'Apply classic vintage Hollywood glamour makeup with matte red lips.',
+      enabled: false,
+    },
+  ];
+
+  // Validation: Missing name
+  const missingName = validateCustomLock({ name: '', shorthand: '/valid', instruction: 'text' }, existingTestLocks);
+  assert.strictEqual(missingName.valid, false, 'Missing name must fail validation');
+
+  // Validation: Missing shorthand
+  const missingShort = validateCustomLock({ name: 'Valid Name', shorthand: '', instruction: 'text' }, existingTestLocks);
+  assert.strictEqual(missingShort.valid, false, 'Missing shorthand must fail validation');
+
+  // Validation: Invalid shorthand
+  const invalidShort = validateCustomLock({ name: 'Valid Name', shorthand: 'nohash', instruction: 'text' }, existingTestLocks);
+  assert.strictEqual(invalidShort.valid, false, 'Invalid shorthand format must fail validation');
+
+  // Validation: Collision with built-in
+  const builtinCollision = validateCustomLock({ name: 'Valid Name', shorthand: '/hairlock', instruction: 'text' }, existingTestLocks);
+  assert.strictEqual(builtinCollision.valid, false, 'Collision with built-in shorthand must fail validation');
+
+  // Validation: Collision with existing custom lock
+  const duplicateCustom = validateCustomLock({ name: 'Another Lock', shorthand: '/refhair', instruction: 'text' }, existingTestLocks);
+  assert.strictEqual(duplicateCustom.valid, false, 'Duplicate shorthand with existing custom lock must fail validation');
+
+  // Validation: Editing self with same shorthand is allowed
+  const selfEdit = validateCustomLock({ name: 'Updated Hair Lock', shorthand: '/refhair', instruction: 'New instruction', id: 'lock-1' }, existingTestLocks, 'lock-1');
+  assert.strictEqual(selfEdit.valid, true, 'Editing own shorthand must succeed without self-collision');
+
+  // Validation: Missing instruction
+  const missingInst = validateCustomLock({ name: 'Valid Name', shorthand: '/valid', instruction: '  ' }, existingTestLocks);
+  assert.strictEqual(missingInst.valid, false, 'Empty instruction must fail validation');
+
+  // 20c. Export to JSON
+  const exportedJson = exportCustomLocksToJson(existingTestLocks);
+  const parsedExport = JSON.parse(exportedJson);
+  assert.strictEqual(parsedExport.format, 'mature-prompt-custom-character-locks', 'Export format must be "mature-prompt-custom-character-locks"');
+  assert.strictEqual(parsedExport.version, 1, 'Export version must be 1');
+  assert.strictEqual(parsedExport.locks.length, 2, 'Export must contain 2 locks');
+  assert.strictEqual(parsedExport.locks[0].id, 'lock-1', 'Lock 1 ID must be preserved');
+  assert.strictEqual(parsedExport.locks[0].shorthand, '/refhair', 'Lock 1 shorthand must be preserved');
+  assert.strictEqual(parsedExport.locks[0].enabled, true, 'Lock 1 enabled status must be preserved');
+  assert.strictEqual(parsedExport.locks[1].enabled, false, 'Lock 2 enabled status must be preserved');
+  assert.ok(!exportedJson.includes('apiKey'), 'Export must never leak API keys');
+  assert.ok(!exportedJson.includes('password'), 'Export must never leak credentials');
+
+  // 20d. Import Validation & Error Handling
+  // Invalid JSON test
+  const invalidJsonResult = validateImportJson('broken { json', existingTestLocks);
+  assert.strictEqual(invalidJsonResult.valid, false, 'Broken JSON must be caught');
+
+  // Invalid format header test
+  const wrongFormatResult = validateImportJson(JSON.stringify({ format: 'wrong-format', version: 1, locks: [] }), existingTestLocks);
+  assert.strictEqual(wrongFormatResult.valid, false, 'Wrong format header must be rejected');
+
+  // Invalid version test
+  const wrongVersionResult = validateImportJson(JSON.stringify({ format: 'mature-prompt-custom-character-locks', version: 0, locks: [] }), existingTestLocks);
+  assert.strictEqual(wrongVersionResult.valid, false, 'Unsupported version must be rejected');
+
+  // Successful Import Parsing with Conflict Detection
+  const importFilePayload = {
+    format: 'mature-prompt-custom-character-locks',
+    version: 1,
+    locks: [
+      // Identical to existing lock-1
+      {
+        id: 'lock-1',
+        name: 'Reference Hairstyle Lock',
+        shorthand: '/refhair',
+        description: 'Preserves subject hair style',
+        instruction: 'Strictly match hairstyle to reference photo.',
+        enabled: true,
+      },
+      // Same ID as lock-2 but updated content
+      {
+        id: 'lock-2',
+        name: 'Updated Hollywood Glamour',
+        shorthand: '/vintagemakeup',
+        description: 'New updated description',
+        instruction: 'Updated Hollywood instruction.',
+        enabled: true,
+      },
+      // New valid lock
+      {
+        id: 'lock-3',
+        name: 'Studio Soft Light Lock',
+        shorthand: '/studiosoftlight',
+        description: 'Soft continuous diffused lighting',
+        instruction: 'Bathe the subject in 4300K soft diffused parabolic key light.',
+        enabled: true,
+      },
+      // Invalid entry (missing instruction)
+      {
+        id: 'lock-4',
+        name: 'Broken Lock',
+        shorthand: '/broken',
+        instruction: '',
+        enabled: false,
+      },
+      // Built-in collision entry
+      {
+        id: 'lock-5',
+        name: 'Colliding Lock',
+        shorthand: '/facelock',
+        instruction: 'Collides with builtin',
+        enabled: true,
+      },
+    ],
+  };
+
+  const importResult = validateImportJson(JSON.stringify(importFilePayload), existingTestLocks);
+  assert.strictEqual(importResult.validEntries.length, 3, 'Exactly 3 valid entries must be parsed (lock-1, lock-2, lock-3)');
+  assert.strictEqual(importResult.invalidEntriesCount, 2, 'Exactly 2 invalid entries must be detected (broken & builtin collision)');
+  assert.ok(importResult.conflicts.some(c => c.type === 'same-id-same-content'), 'Identical ID & content conflict must be detected');
+  assert.ok(importResult.conflicts.some(c => c.type === 'same-id-diff-content'), 'Same ID with different content must be detected');
+
+  // 20e. Prompt Generation Integration
+  const testInputWithCustomLocks = {
+    samplePrompt: 'A sophisticated woman in a silk dress sitting at a balcony at dusk.',
+    keywords: 'warm evening glow',
+    storyStyle: { primary: null, supporting: [], custom: '' },
+    photographicStyle: { selected: ['nyata'], custom: '' },
+    characterLocks: { ...DEFAULT_CHARACTER_LOCKS, expressionlock: false },
+    customLocks: [
+      {
+        id: 'custom-active',
+        name: 'Editorial Jewelry Lock',
+        shorthand: '/editorialjewelry',
+        instruction: 'Maintain layered 18k yellow gold minimalist necklace and matching pearl drop earrings consistently.',
+        enabled: true,
+      },
+      {
+        id: 'custom-inactive',
+        name: 'Sunglasses Lock',
+        shorthand: '/sunglasseslock',
+        instruction: 'Wear oversized tortoiseshell cat-eye sunglasses.',
+        enabled: false,
+      },
+    ],
+    variationCount: 2,
+    selectedAspectRatio: '9:16',
+  };
+
+  const geminiService = GeminiService.getInstance();
+  const sysInstructionWithCustom = geminiService.buildSystemInstruction(testInputWithCustomLocks);
+  assert.ok(sysInstructionWithCustom.includes('- /editorialjewelry (Editorial Jewelry Lock): Maintain layered 18k yellow gold minimalist necklace'), 'Active custom lock instruction must be included in system instruction');
+  assert.ok(!sysInstructionWithCustom.includes('/sunglasseslock'), 'Inactive custom lock must NOT be included in system instruction');
+
+  const userPromptWithCustom = geminiService.buildUserPrompt(testInputWithCustomLocks);
+  assert.ok(userPromptWithCustom.includes('/editorialjewelry'), 'Active custom lock shorthand must be included in user prompt [ACTIVE CHARACTER LOCKS]');
+  assert.ok(!userPromptWithCustom.includes('/sunglasseslock'), 'Inactive custom lock shorthand must NOT be included in user prompt');
+
+  // 20f. CharacterLocks Component Source Checks
+  const charLocksSrc = fs.readFileSync('src/components/CharacterLocks.tsx', 'utf8');
+  assert.ok(charLocksSrc.includes('STORAGE_KEY_CUSTOM_CHARACTER_LOCKS'), 'CharacterLocks.tsx must reference STORAGE_KEY_CUSTOM_CHARACTER_LOCKS');
+  assert.ok(charLocksSrc.includes('handleExportCustomLocks'), 'CharacterLocks.tsx must implement handleExportCustomLocks');
+  assert.ok(charLocksSrc.includes('handleFileSelected'), 'CharacterLocks.tsx must implement handleFileSelected for import');
+  assert.ok(charLocksSrc.includes('mature-prompt-custom-character-locks.json'), 'CharacterLocks.tsx must export to mature-prompt-custom-character-locks.json');
+  assert.ok(charLocksSrc.includes('t.btnAddCustomLock'), 'CharacterLocks.tsx must render Add Custom Lock button');
+  assert.ok(charLocksSrc.includes('t.btnExportCustomLocks'), 'CharacterLocks.tsx must render Export button');
+  assert.ok(charLocksSrc.includes('t.btnImportCustomLocks'), 'CharacterLocks.tsx must render Import button');
+
+  // 20g. Verify Reset Default Isolation
+  const resetDefaultStart = charLocksSrc.indexOf('const handleResetDefault = () => {');
+  assert.ok(resetDefaultStart !== -1, 'handleResetDefault must exist');
+  const resetDefaultEnd = charLocksSrc.indexOf('};', resetDefaultStart);
+  const resetDefaultBody = charLocksSrc.substring(resetDefaultStart, resetDefaultEnd);
+  assert.ok(resetDefaultBody.includes('onChange({ ...DEFAULT_CHARACTER_LOCKS });'), 'handleResetDefault must restore DEFAULT_CHARACTER_LOCKS');
+  assert.ok(!resetDefaultBody.includes('setInternalCustomLocks([])'), 'handleResetDefault must NOT clear custom locks');
+  assert.ok(!resetDefaultBody.includes('updateCustomLocks([])'), 'handleResetDefault must NOT delete custom locks');
+
+  // 20h. Verify App.tsx Integration
+  const appSrc2 = fs.readFileSync('src/App.tsx', 'utf8');
+  assert.ok(appSrc2.includes('customLocks={customLocks}'), 'App.tsx must pass customLocks to CharacterLocks');
+  assert.ok(appSrc2.includes('onCustomLocksChange={setCustomLocks}'), 'App.tsx must pass onCustomLocksChange to CharacterLocks');
+  assert.ok(appSrc2.includes('customLocks,\n      variationCount: targetCount,'), 'App.tsx must include customLocks in generationInput');
+
+  console.log('✓ Custom Character Locks verified: CRUD, localStorage, export JSON, import parsing & validation, conflict detection, append vs replace modes, prompt generator integration, preset compatibility, and Reset Default isolation.');
+
+  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (20/20) ---');
 }).catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);

@@ -62,7 +62,26 @@ export interface CharacterLockPreset {
   description?: string;
   isBuiltIn?: boolean;
   locks: CharacterLocksState;
+  customLockStates?: Record<string, boolean>;
   updatedAt?: number;
+}
+
+export interface CustomCharacterLock {
+  id: string;
+  name: string;
+  shorthand: string; // e.g. '/referencehair'
+  description?: string;
+  instruction: string;
+  enabled: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface CustomLocksExportFile {
+  format: 'mature-prompt-custom-character-locks';
+  version: number;
+  exportedAt?: string;
+  locks: CustomCharacterLock[];
 }
 
 export const DEFAULT_CHARACTER_LOCKS: CharacterLocksState = {
@@ -179,6 +198,7 @@ export interface GenerationInput {
   storyStyle: StoryStyleSelection;
   photographicStyle: PhotographicStyleSelection;
   characterLocks: CharacterLocksState;
+  customLocks?: CustomCharacterLock[];
   variationCount: number;
   selectedAspectRatio?: string;
   referenceImage?: ReferenceImageData | null;

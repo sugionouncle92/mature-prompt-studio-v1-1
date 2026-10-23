@@ -30,10 +30,12 @@ import {
   OutfitLayeringConfig,
   OutfitLayeringMode,
   SubjectOutfitConfig,
+  CustomCharacterLock,
 } from './types/index.ts';
 import { GeminiService } from './services/geminiService.ts';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { DEFAULT_PHOTOGRAPHIC_STYLES } from './data/photographicStyles.ts';
+import { loadCustomLocksFromStorage, saveCustomLocksToStorage } from './data/characterLocks.ts';
 
 const STORAGE_KEY_API = 'mature_prompt_studio_api_key';
 const STORAGE_KEY_MODEL = 'mature_prompt_studio_model_id';
@@ -178,6 +180,15 @@ const StudioContent: React.FC = () => {
       // ignore
     }
   }, [characterLocks]);
+
+  // Custom Character Locks State
+  const [customLocks, setCustomLocks] = useState<CustomCharacterLock[]>(() =>
+    loadCustomLocksFromStorage()
+  );
+
+  useEffect(() => {
+    saveCustomLocksToStorage(customLocks);
+  }, [customLocks]);
 
   // Variations & Aspect Ratio (Default: 9:16)
   const [variationConfig, setVariationConfig] = useState<VariationConfig>({
@@ -396,6 +407,7 @@ const StudioContent: React.FC = () => {
       storyStyle,
       photographicStyle,
       characterLocks,
+      customLocks,
       variationCount: targetCount,
       selectedAspectRatio,
       referenceImages,
@@ -564,6 +576,8 @@ const StudioContent: React.FC = () => {
         <CharacterLocks
           locks={characterLocks}
           onChange={setCharacterLocks}
+          customLocks={customLocks}
+          onCustomLocksChange={setCustomLocks}
         />
 
         {/* 6. Variation Settings & Aspect Ratio */}

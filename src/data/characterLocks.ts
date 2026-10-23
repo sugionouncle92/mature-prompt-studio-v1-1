@@ -1,4 +1,4 @@
-import type { CharacterLocksState, CharacterLockPreset } from '../types/index.ts';
+import type { CharacterLocksState, CharacterLockPreset, CustomCharacterLock, CustomLocksExportFile } from '../types/index.ts';
 
 export interface CharacterLockItem {
   key: keyof CharacterLocksState;
@@ -599,5 +599,343 @@ export function areLocksEqual(a?: CharacterLocksState | null, b?: CharacterLocks
  */
 export function getBuiltinPresetById(id: string): CharacterLockPreset | undefined {
   return BUILTIN_CHARACTER_LOCK_PRESETS.find((p) => p.id === id);
+}
+
+/* ==========================================================================
+ * CUSTOM CHARACTER LOCKS CONSTANTS, VALIDATORS, STORAGE & EXPORT/IMPORT
+ * ========================================================================== */
+
+export const STORAGE_KEY_CUSTOM_CHARACTER_LOCKS = 'mature_prompt_studio_custom_locks_v1';
+
+export const RESERVED_BUILTIN_SHORTHANDS: string[] = [
+  '/facelock 100%',
+  '/facelock',
+  '/bodyshape_lock',
+  '/bodyshape lock',
+  '/outfitlock',
+  '/poselock',
+  '/agepreserve',
+  '/expressionlock',
+  '/hairlock',
+  '/bodyproportionlock',
+  '/anatomylock',
+  '/poseconsistency',
+  '/perspectivecorrection',
+  '/identitylock',
+  '/referencepriority',
+  '/facial-consistency',
+  '/master-face-lock',
+  '/photorealism',
+  '/maximum-detail',
+  '/natural-skin-texture',
+  '/anti-ai-artifacts',
+];
+
+export function normalizeShorthand(raw: string): string {
+  let s = (raw || '').trim().toLowerCase();
+  if (!s.startsWith('/')) {
+    s = '/' + s;
+  }
+  return s;
+}
+
+export function isValidShorthand(raw: string): boolean {
+  if (!raw || typeof raw !== 'string') return false;
+  const trimmed = raw.trim();
+  return /^\/[a-zA-Z0-9_\-]+$/.test(trimmed);
+}
+
+export function isBuiltinShorthandCollision(shorthand: string): boolean {
+  const norm = normalizeShorthand(shorthand);
+  return RESERVED_BUILTIN_SHORTHANDS.some((b) => normalizeShorthand(b) === norm);
+}
+
+export interface CustomLockValidationResult {
+  valid: boolean;
+  field?: 'name' | 'shorthand' | 'instruction';
+  error?: string;
+}
+
+export function validateCustomLock(
+  lock: { name?: string; shorthand?: string; instruction?: string; id?: string },
+  existingLocks: CustomCharacterLock[],
+  editingLockId?: string
+): CustomLockValidationResult {
+  if (!lock.name || !lock.name.trim()) {
+    return { valid: false, field: 'name', error: 'Nama lock wajib diisi.' };
+  }
+  if (!lock.shorthand || !lock.shorthand.trim()) {
+    return { valid: false, field: 'shorthand', error: 'Shorthand wajib diisi.' };
+  }
+  if (!isValidShorthand(lock.shorthand)) {
+    return {
+      valid: false,
+      field: 'shorthand',
+      error: 'Format shorthand tidak valid. Harus diawali "/" dan hanya memuat huruf, angka, tanda minus, atau garis bawah (contoh: /referencehair).',
+    };
+  }
+  if (isBuiltinShorthandCollision(lock.shorthand)) {
+    return {
+      valid: false,
+      field: 'shorthand',
+      error: `Shorthand "${lock.shorthand}" bertabrakan dengan tag pengunci bawaan sistem. Harap gunakan shorthand lain.`,
+    };
+  }
+  const norm = normalizeShorthand(lock.shorthand);
+  const duplicate = existingLocks.find(
+    (other) => other.id !== editingLockId && normalizeShorthand(other.shorthand) === norm
+  );
+  if (duplicate) {
+    return {
+      valid: false,
+      field: 'shorthand',
+      error: `Shorthand "${lock.shorthand}" sudah digunakan oleh custom lock "${duplicate.name}". Harap gunakan shorthand unik.`,
+    };
+  }
+  if (!lock.instruction || !lock.instruction.trim()) {
+    return { valid: false, field: 'instruction', error: 'Instruksi lock wajib diisi.' };
+  }
+  return { valid: true };
+}
+
+export function loadCustomLocksFromStorage(): CustomCharacterLock[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_CHARACTER_LOCKS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item) =>
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.name === 'string' &&
+        typeof item.shorthand === 'string' &&
+        typeof item.instruction === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomLocksToStorage(locks: CustomCharacterLock[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_CUSTOM_CHARACTER_LOCKS, JSON.stringify(locks));
+  } catch (err) {
+    console.error('Failed to save custom locks to localStorage', err);
+    throw err;
+  }
+}
+
+export function exportCustomLocksToJson(locks: CustomCharacterLock[]): string {
+  const exportPayload: CustomLocksExportFile = {
+    format: 'mature-prompt-custom-character-locks',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    locks: locks.map((l) => ({
+      id: l.id,
+      name: l.name,
+      shorthand: l.shorthand,
+      description: l.description || '',
+      instruction: l.instruction,
+      enabled: Boolean(l.enabled),
+      createdAt: l.createdAt,
+      updatedAt: l.updatedAt,
+    })),
+  };
+  return JSON.stringify(exportPayload, null, 2);
+}
+
+export interface ImportConflictItem {
+  type: 'same-id-same-content' | 'same-id-diff-content' | 'shorthand-collision-builtin' | 'shorthand-collision-existing';
+  lock: CustomCharacterLock;
+  existingMatch?: CustomCharacterLock;
+  message: string;
+}
+
+export interface ImportValidationResult {
+  valid: boolean;
+  totalParsed: number;
+  validEntries: CustomCharacterLock[];
+  invalidEntriesCount: number;
+  errors: string[];
+  conflicts: ImportConflictItem[];
+}
+
+export function validateImportJson(
+  rawJson: string,
+  existingLocks: CustomCharacterLock[]
+): ImportValidationResult {
+  const errors: string[] = [];
+  const conflicts: ImportConflictItem[] = [];
+  const validEntries: CustomCharacterLock[] = [];
+  let invalidEntriesCount = 0;
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch (e) {
+    return {
+      valid: false,
+      totalParsed: 0,
+      validEntries: [],
+      invalidEntriesCount: 0,
+      errors: ['Format file bukan JSON yang valid.'],
+      conflicts: [],
+    };
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return {
+      valid: false,
+      totalParsed: 0,
+      validEntries: [],
+      invalidEntriesCount: 0,
+      errors: ['Struktur file JSON tidak valid.'],
+      conflicts: [],
+    };
+  }
+
+  if (parsed.format !== 'mature-prompt-custom-character-locks') {
+    return {
+      valid: false,
+      totalParsed: 0,
+      validEntries: [],
+      invalidEntriesCount: 0,
+      errors: [
+        `Format file tidak sesuai: "${parsed.format || 'unknown'}". Diharapkan format "mature-prompt-custom-character-locks".`,
+      ],
+      conflicts: [],
+    };
+  }
+
+  if (typeof parsed.version !== 'number' || parsed.version < 1) {
+    return {
+      valid: false,
+      totalParsed: 0,
+      validEntries: [],
+      invalidEntriesCount: 0,
+      errors: [`Versi format (${parsed.version}) tidak didukung.`],
+      conflicts: [],
+    };
+  }
+
+  if (!Array.isArray(parsed.locks)) {
+    return {
+      valid: false,
+      totalParsed: 0,
+      validEntries: [],
+      invalidEntriesCount: 0,
+      errors: ['Field "locks" harus berupa array daftar custom locks.'],
+      conflicts: [],
+    };
+  }
+
+  const existingById = new Map(existingLocks.map((l) => [l.id, l]));
+  const existingByShorthand = new Map(
+    existingLocks.map((l) => [normalizeShorthand(l.shorthand), l])
+  );
+
+  const seenInFileById = new Set<string>();
+  const seenInFileByShorthand = new Set<string>();
+
+  for (let i = 0; i < parsed.locks.length; i++) {
+    const raw = parsed.locks[i];
+    if (!raw || typeof raw !== 'object') {
+      invalidEntriesCount++;
+      errors.push(`Entri #${i + 1}: format entri tidak valid.`);
+      continue;
+    }
+
+    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+    const shorthand = typeof raw.shorthand === 'string' ? raw.shorthand.trim() : '';
+    const instruction = typeof raw.instruction === 'string' ? raw.instruction : '';
+    const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+    const enabled = Boolean(raw.enabled);
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `custom-lock-${Date.now()}-${i}`;
+
+    if (!name || !shorthand || !instruction.trim()) {
+      invalidEntriesCount++;
+      errors.push(`Entri #${i + 1} ("${name || 'Tanpa Nama'}"): Nama, shorthand, dan instruksi wajib diisi.`);
+      continue;
+    }
+
+    if (!isValidShorthand(shorthand)) {
+      invalidEntriesCount++;
+      errors.push(`Entri #${i + 1} ("${name}"): Format shorthand "${shorthand}" tidak valid.`);
+      continue;
+    }
+
+    if (isBuiltinShorthandCollision(shorthand)) {
+      invalidEntriesCount++;
+      errors.push(`Entri #${i + 1} ("${name}"): Shorthand "${shorthand}" bertabrakan dengan Character Locks bawaan.`);
+      continue;
+    }
+
+    const normShorthand = normalizeShorthand(shorthand);
+
+    if (seenInFileByShorthand.has(normShorthand)) {
+      invalidEntriesCount++;
+      errors.push(`Entri #${i + 1} ("${name}"): Shorthand "${shorthand}" duplikat dalam berkas impor.`);
+      continue;
+    }
+    seenInFileByShorthand.add(normShorthand);
+    seenInFileById.add(id);
+
+    const lockObj: CustomCharacterLock = {
+      id,
+      name,
+      shorthand,
+      description,
+      instruction,
+      enabled,
+      createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+      updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
+    };
+
+    validEntries.push(lockObj);
+
+    const matchId = existingById.get(id);
+    const matchShorthand = existingByShorthand.get(normShorthand);
+
+    if (matchId) {
+      const isIdentical =
+        matchId.name === lockObj.name &&
+        normalizeShorthand(matchId.shorthand) === normShorthand &&
+        matchId.instruction.trim() === lockObj.instruction.trim();
+
+      if (isIdentical) {
+        conflicts.push({
+          type: 'same-id-same-content',
+          lock: lockObj,
+          existingMatch: matchId,
+          message: `ID "${id}" dan isi identik dengan lock lokal "${matchId.name}".`,
+        });
+      } else {
+        conflicts.push({
+          type: 'same-id-diff-content',
+          lock: lockObj,
+          existingMatch: matchId,
+          message: `ID "${id}" sudah ada di lokal dengan konten berbeda ("${matchId.name}").`,
+        });
+      }
+    } else if (matchShorthand) {
+      conflicts.push({
+        type: 'shorthand-collision-existing',
+        lock: lockObj,
+        existingMatch: matchShorthand,
+        message: `Shorthand "${shorthand}" sudah digunakan oleh lock lokal "${matchShorthand.name}" (ID berbeda).`,
+      });
+    }
+  }
+
+  return {
+    valid: errors.length === 0 && validEntries.length > 0,
+    totalParsed: parsed.locks.length,
+    validEntries,
+    invalidEntriesCount,
+    errors,
+    conflicts,
+  };
 }
 
