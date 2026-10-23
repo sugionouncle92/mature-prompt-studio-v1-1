@@ -173,23 +173,6 @@ export interface ReferenceImageData {
   size: number;
 }
 
-export type UndergarmentControlMode =
-  | 'Preserve'
-  | 'Match Outfit'
-  | 'Concealed'
-  | 'No Undergarment Layer'
-  | 'Editorial Minimal Layering'
-  | 'Custom';
-
-export const UNDERGARMENT_CONTROL_MODES: UndergarmentControlMode[] = [
-  'Preserve',
-  'Match Outfit',
-  'Concealed',
-  'No Undergarment Layer',
-  'Editorial Minimal Layering',
-  'Custom',
-];
-
 export type OutfitLayeringMode =
   | 'Automatic'
   | 'Automatic — Match Uploaded Outfit'
@@ -197,8 +180,7 @@ export type OutfitLayeringMode =
   | 'Original Outfit Preservation'
   | 'Exact Outfit Match'
   | 'Preserve Visible Layers'
-  | 'Custom Outfit Instructions'
-  | UndergarmentControlMode;
+  | 'Custom Outfit Instructions';
 
 export interface SubjectOutfitConfig {
   mode: OutfitLayeringMode;

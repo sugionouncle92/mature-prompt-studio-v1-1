@@ -299,11 +299,9 @@ export class GeminiService {
     // 1. Sanitize & enforce active outfit & layering control rules across 100% of variations
     const anyTransparentMode =
       input.outfitLayeringConfig?.mode === 'Transparent Fabric Preservation' ||
-      input.outfitLayeringConfig?.mode === 'No Undergarment Layer' ||
-      input.outfitLayeringConfig?.mode === 'Editorial Minimal Layering' ||
       (input.referenceImages && input.referenceImages.some((subj) => {
         const mode = input.outfitLayeringConfigs?.[subj.id]?.mode;
-        return mode === 'Transparent Fabric Preservation' || mode === 'No Undergarment Layer' || mode === 'Editorial Minimal Layering';
+        return mode === 'Transparent Fabric Preservation';
       }));
 
     const effectiveLayeringMode = anyTransparentMode
@@ -413,16 +411,14 @@ export class GeminiService {
 
     const anyTransparentMode =
       input.outfitLayeringConfig?.mode === 'Transparent Fabric Preservation' ||
-      input.outfitLayeringConfig?.mode === 'No Undergarment Layer' ||
-      input.outfitLayeringConfig?.mode === 'Editorial Minimal Layering' ||
       (input.referenceImages && input.referenceImages.some((subj) => {
         const mode = input.outfitLayeringConfigs?.[subj.id]?.mode;
-        return mode === 'Transparent Fabric Preservation' || mode === 'No Undergarment Layer' || mode === 'Editorial Minimal Layering';
+        return mode === 'Transparent Fabric Preservation';
       }));
 
     const effectiveLayeringMode = anyTransparentMode
       ? 'Transparent Fabric Preservation'
-      : (input.outfitLayeringConfig?.mode || 'Preserve');
+      : (input.outfitLayeringConfig?.mode || 'Automatic');
 
     let repairedPromptText = item.prompt;
 
@@ -705,15 +701,10 @@ RULES:
 
     const isTransparentMode =
       input.outfitLayeringConfig?.mode === 'Transparent Fabric Preservation' ||
-      input.outfitLayeringConfig?.mode === 'No Undergarment Layer' ||
-      input.outfitLayeringConfig?.mode === 'Editorial Minimal Layering' ||
       Boolean(
         input.referenceImages &&
           input.referenceImages.some(
-            (s) => {
-              const m = input.outfitLayeringConfigs?.[s.id]?.mode;
-              return m === 'Transparent Fabric Preservation' || m === 'No Undergarment Layer' || m === 'Editorial Minimal Layering';
-            }
+            (s) => input.outfitLayeringConfigs?.[s.id]?.mode === 'Transparent Fabric Preservation'
           )
       );
 
@@ -755,7 +746,7 @@ RULES:
         passedChecks.push('outfitCheckMaterialMesh');
         passedChecks.push('outfitCheckPanelsTransparency');
       } else {
-        warnings.push('Deskripsi material transparan/mesh tidak terdeteksi pada prompt saat mode No Undergarment Layer / Transparent Fabric aktif.');
+        warnings.push('Deskripsi material transparan/mesh tidak terdeteksi pada prompt saat mode Transparent Fabric Preservation aktif.');
       }
     }
 
@@ -834,11 +825,7 @@ RULES:
   ): string {
     let cleaned = prompt.trim();
 
-    if (
-      mode === 'Transparent Fabric Preservation' ||
-      mode === 'No Undergarment Layer' ||
-      mode === 'Editorial Minimal Layering'
-    ) {
+    if (mode === 'Transparent Fabric Preservation') {
       const unwantedModestyPatterns = [
         /,\s*(?:with|featuring|wearing|layered with|layered over|worn over|worn with|paired with)\s+(?:an?\s+)?(?:(?:opaque|modesty|nude|matching|dark|white|black|inner|flesh-toned|skin-toned)\s+)*(?:slip|camisole|undershirt|lining|layer|underlayer|undergarment|undergarments|bra and panties|bra)\s*(?:underneath|beneath|inside|under)?/gi,
         /\b(?:with|featuring|wearing|layered with|layered over|worn over|worn with|paired with)\s+(?:an?\s+)?(?:(?:opaque|modesty|nude|matching|dark|white|black|inner|flesh-toned|skin-toned)\s+)*(?:slip|camisole|undershirt|lining|layer|underlayer|undergarment|undergarments|bra and panties|bra)\s*(?:underneath|beneath|inside|under)?/gi,
@@ -937,50 +924,6 @@ RULES:
 
     const buildLayeringModeDirective = (mode: string, customInst: string): string => {
       switch (mode) {
-        case 'Preserve':
-          return `UNDERGARMENT & LAYERING CONTROL MODE: "Preserve"
-- FAITHFUL OUTFIT & LAYERING PRESERVATION:
-  * Replicate the mapped outfit reference (or fallback to subject reference clothing) as the primary garment blueprint.
-  * Faithfully preserve observable undergarments, lining, and internal/visible clothing layers directly present in the reference image.
-  * DO NOT invent, fabricate, or inject extra unrequested inner layers or undergarments.
-  * Maintain authentic garment lines, silhouettes, straps, neckline, and structural layers as seen in the reference without modification.`;
-
-        case 'Match Outfit':
-          return `UNDERGARMENT & LAYERING CONTROL MODE: "Match Outfit"
-- MATCH OUTFIT HARMONY: Ensure all undergarments and underlying fabric layers seamlessly match the exact color tone, fabric material, and styling aesthetics of the outer outfit.
-  * Replicate the mapped outfit reference's cut, neckline, straps, and silhouette.
-  * Create a cohesive, well-coordinated high-end fashion appearance where base layers feel intentionally designed with the primary garment.`;
-
-        case 'Concealed':
-          return `UNDERGARMENT & LAYERING CONTROL MODE: "Concealed"
-- CONCEALED BASE LAYERS: Ensure all undergarments and inner layers are completely invisible, seamless, or modesty-concealed beneath the outerwear.
-  * Replicate the mapped outfit reference silhouette, cuts, straps, and styling cleanly.
-  * No visible bra straps, panty lines, or peeking undergarment edges. Clean, uninterrupted contours and polished silhouette.`;
-
-        case 'No Undergarment Layer':
-          return `UNDERGARMENT & LAYERING CONTROL MODE: "No Undergarment Layer"
-- NO UNDERGARMENT LAYER / UNLINED SHEER PRESERVATION (CRITICAL BLUEPRINT MANDATE):
-  * SOVEREIGN BLUEPRINT AUTHORITY: The uploaded outfit reference is the exact design blueprint for the garment. Analyze and replicate all observable physical characteristics.
-  * PRESERVE EXACT SILHOUETTE, CUT & LENGTH: Retain the exact overall silhouette, cut, garment category, and length observed in the reference outfit (e.g. if the reference depicts a sleeveless sheer top, dress, or gown, replicate that exact cut).
-  * SHOULDER STRAPS, NECKLINES & EDGES: Faithfully replicate the exact shape and positioning of shoulder straps, plunge/v-neckline, and finished hem/border edge lines.
-  * MATERIAL TEXTURE, MESH PATTERNS & TRANSLUCENCY: Faithfully preserve all sheer, mesh, tulle, translucent chiffon, and delicate transparent lace fabric characteristics unlined.
-  * UNLINED SHEER / NO MODESTY LAYERING: Absolutely do NOT add modesty slips, camisoles, undershirts, bra cups, or unrequested inner undergarments beneath sheer or mesh garments. Preserve the garment authentically unlined.
-  * FORBIDDEN INNER MODESTY ADDITIONS: Under NO circumstances should generated prompt texts contain phrases like "slip underneath", "camisole underneath", "modesty lining", "opaque lining", "undergarment layer", "lined with opaque fabric", or "inner slip".
-  * SEAMS & STRUCTURAL DETAILS: Preserve visible tailored seamlines, borders, and fabric join lines that define the outfit structure.
-  * SEPARATION OF GARMENT DESIGN FROM BODY FIT: Lock the exact garment design to the reference while allowing natural fabric drape and tension over the subject's anatomy.`;
-
-        case 'Editorial Minimal Layering':
-          return `UNDERGARMENT & LAYERING CONTROL MODE: "Editorial Minimal Layering"
-- EDITORIAL MINIMAL LAYERING (HIGH FASHION):
-  * Clean, minimal haute-couture layering aesthetic prioritizing avant-garde garment lines, intentional negative space, and uncompromised fabric transparency.
-  * Strips away clunky undergarments, preserving bare-minimum structural layers only where structurally necessary for the outer garment's architecture.
-  * Do NOT insert generic opaque modesty slips or bulky inner garments under translucent fabrics.`;
-
-        case 'Custom':
-          return `UNDERGARMENT & LAYERING CONTROL MODE: "Custom"
-- CUSTOM UNDERGARMENT DIRECTIVES: ${customInst ? `"${customInst}"` : 'User has specified custom undergarment mode.'}
-- Faithfully integrate the user's custom instructions for undergarments, base layers, and inner garments into the scene description.`;
-
         case 'Original Outfit Preservation':
         case 'Exact Outfit Match':
           return `OUTFIT & LAYERING CONTROL MODE: "${mode}"
@@ -1211,7 +1154,7 @@ PRIORITY OF SOURCES & CONFLICT RESOLUTION:
 2. Visual identity and Character Locks from Subject Reference (highest priority, inviolable for facial features, hair, and body proportions).
 3. Garment Design from Mapped Outfit Reference (sovereign blueprint authority for clothing design, cuts, straps, panels, materials, and transparency; strictly prevents subject's visible clothing from bleeding into or overwriting the dedicated outfit design).
 4. Natural Body Fit & Drape (drapes the locked garment design realistically over the subject's anatomy with authentic fabric tension, folds, and gravity, without altering the underlying design).
-5. Selected Outfit & Layering / Undergarment Control rules (applied per-subject based on individual configurations; preserves unlined sheer fabrics and prevents unwanted modesty additions).
+5. Selected Outfit & Layering rules (preserves unlined sheer fabrics and prevents unwanted modesty additions).
 6. Selected Story Style & Photographic Style (modulates atmosphere, lighting, camera framing, and narrative interaction WITHOUT modifying, overwriting, or deleting core outfit structural details).
 7. User's compatible textual instructions (if custom instructions provided).
 8. Creative variations in scene framing, pose, lighting, and mood (applied within the boundaries of the preserved and modified attributes).
@@ -1466,21 +1409,11 @@ Ensure all prompt variations strictly reflect this framing without conflicting c
         const config = input.outfitLayeringConfigs?.[subj.id] || input.outfitLayeringConfig || { mode: 'Automatic' };
         const mode = config.mode;
         const custom = config.customInstructions?.trim();
-        if (mode === 'Transparent Fabric Preservation' || mode === 'No Undergarment Layer') {
+        if (mode === 'Transparent Fabric Preservation') {
           return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"):
     * Strictly preserve all sheer/mesh/tulle/lace transparency without adding unrequested modesty slips, camisoles, or opaque under-layers.
     * Replicate exact silhouette, shoulder straps, neckline, visible seams, and panel distribution from the uploaded outfit reference.
     * Do NOT alter the garment category (e.g. do NOT turn mesh gowns into bodysuits) and do NOT homogenize transparent vs opaque zones.`;
-        } else if (mode === 'Editorial Minimal Layering') {
-          return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"): Editorial minimal layering with clean silhouette and authentic fabric transparency without bulky undergarments or modesty slips.`;
-        } else if (mode === 'Preserve') {
-          return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"): Preserve original undergarments and clothing layers from the reference image without adding unrequested garments.`;
-        } else if (mode === 'Match Outfit') {
-          return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"): Match undergarments to the outfit's colors, materials, and styling seamlessly.`;
-        } else if (mode === 'Concealed') {
-          return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"): Conceal all undergarment layers seamlessly with no visible lines or peeking edges.`;
-        } else if (mode === 'Custom') {
-          return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"):${custom ? ` Custom Undergarment Instructions: "${custom}"` : ' Apply custom undergarment styling'}.`;
         } else if (mode === 'Original Outfit Preservation' || mode === 'Exact Outfit Match') {
           return `  - Subject ${idx + 1} ("${subj.name}") (Mode: "${mode}"): 1:1 strict preservation of the uploaded/referenced outfit colors, cuts, patterns, and materials.`;
         } else if (mode === 'Preserve Visible Layers') {
@@ -1494,10 +1427,10 @@ Ensure all prompt variations strictly reflect this framing without conflicting c
 
       const anyTransparent = input.referenceImages.some((subj) => {
         const mode = input.outfitLayeringConfigs?.[subj.id]?.mode;
-        return mode === 'Transparent Fabric Preservation' || mode === 'No Undergarment Layer' || mode === 'Editorial Minimal Layering';
+        return mode === 'Transparent Fabric Preservation';
       });
 
-      parts.push(`\n[PER-SUBJECT OUTFIT & LAYERING CONTROL]:\n${perSubjectDirectives}\nEnforce these per-subject outfit and layering rules consistently across 100% of generated variations.${anyTransparent ? '\nCRITICAL: One or more subjects use "Transparent Fabric Preservation" or "No Undergarment Layer" — do NOT generate phrases like "slip underneath", "modesty lining", or "opaque undergarments".' : ''}`);
+      parts.push(`\n[PER-SUBJECT OUTFIT & LAYERING CONTROL]:\n${perSubjectDirectives}\nEnforce these per-subject outfit and layering rules consistently across 100% of generated variations.${anyTransparent ? '\nCRITICAL: One or more subjects use "Transparent Fabric Preservation" — do NOT generate phrases like "slip underneath", "modesty lining", or "opaque undergarments".' : ''}`);
 
       parts.push(`\n[STRICT OUTFIT REFERENCE MATCH & GARMENT DESIGN LOCK]:
 - Primary authority for clothing: Uploaded Outfit Reference images.

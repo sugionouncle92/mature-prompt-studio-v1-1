@@ -32,7 +32,7 @@ import {
 } from '../src/data/photographicStyles.ts';
 import { GeminiService } from '../src/services/geminiService.ts';
 import { translations } from '../src/i18n/translations.ts';
-import { UNDERGARMENT_CONTROL_MODES, DEFAULT_CHARACTER_LOCKS } from '../src/types/index.ts';
+import { DEFAULT_CHARACTER_LOCKS } from '../src/types/index.ts';
 import {
   ALL_FRAMING_OPTIONS,
   MANUAL_FRAMING_OPTIONS,
@@ -776,78 +776,54 @@ assert.strictEqual(checkPlain.status, 'info');
 
 console.log('✓ Outfit reference fidelity prompt directives and automated validation checks verified.');
 
-// 5k. Verify Undergarment Control Mode for Outfit Upload 1
-console.log('Test 5k: Verify Undergarment Control Mode for Outfit Upload 1...');
-assert.deepStrictEqual(UNDERGARMENT_CONTROL_MODES, [
-  'Preserve',
-  'Match Outfit',
-  'Concealed',
-  'No Undergarment Layer',
-  'Editorial Minimal Layering',
-  'Custom',
-], 'UNDERGARMENT_CONTROL_MODES must match the exact 6 modes and ordering');
+// 5k. Verify Removal of Undergarment Control Mode & Preservation of Core Outfit Features
+console.log('Test 5k: Verify Removal of Undergarment Control Mode & Preservation of Core Outfit Features...');
 
-for (const ugMode of UNDERGARMENT_CONTROL_MODES) {
-  const ugInput = {
-    ...mockMultiImageInput,
-    referenceImages: [
-      { id: 'subj-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Subject 1', size: 1000 },
-    ],
-    outfitImages: {
-      'subj-1': { id: 'outfit-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Sheer Mesh Dress', size: 1200 },
-    },
-    outfitLayeringConfigs: {
-      'subj-1': { mode: ugMode, customInstructions: ugMode === 'Custom' ? 'Silk bralette' : '' },
-    },
-  };
+// 1. Verify OutfitReferenceInput component has no undergarment control elements
+const outfitInputSrc = fs.readFileSync('src/components/OutfitReferenceInput.tsx', 'utf8');
+assert.ok(!outfitInputSrc.includes('undergarmentControlTitle'), 'OutfitReferenceInput must NOT contain undergarmentControlTitle');
+assert.ok(!outfitInputSrc.includes('UNDERGARMENT_CONTROL_MODES'), 'OutfitReferenceInput must NOT contain UNDERGARMENT_CONTROL_MODES');
+assert.ok(!outfitInputSrc.includes('getUndergarmentModeDescription'), 'OutfitReferenceInput must NOT contain getUndergarmentModeDescription');
+assert.ok(!outfitInputSrc.includes('Prioritas: Clothing Lock'), 'OutfitReferenceInput must NOT contain undergarment priority text');
+assert.ok(!outfitInputSrc.includes('undergarment-control-mode'), 'OutfitReferenceInput must NOT contain undergarment-control-mode id');
 
-  const ugSysInst = service1['buildSystemInstruction'](ugInput);
-  assert.ok(ugSysInst.includes(`UNDERGARMENT & LAYERING CONTROL MODE: "${ugMode}"`), `System instruction must include directive for "${ugMode}"`);
+// 2. Verify OutfitReferenceInput preserves all core outfit features
+assert.ok(outfitInputSrc.includes('outfitReferenceTitle'), 'OutfitReferenceInput must preserve outfitReferenceTitle');
+assert.ok(outfitInputSrc.includes('outfitUploadBtn'), 'OutfitReferenceInput must preserve outfitUploadBtn');
+assert.ok(outfitInputSrc.includes('outfitReplaceBtn'), 'OutfitReferenceInput must preserve outfitReplaceBtn');
+assert.ok(outfitInputSrc.includes('outfitRemoveBtn'), 'OutfitReferenceInput must preserve outfitRemoveBtn');
+assert.ok(outfitInputSrc.includes('outfitFallbackActive'), 'OutfitReferenceInput must preserve outfitFallbackActive');
+assert.ok(outfitInputSrc.includes('dragDropText'), 'OutfitReferenceInput must preserve dragDropText');
 
-  const ugUserPrompt = service1['buildUserPrompt'](ugInput);
-  assert.ok(ugUserPrompt.includes(`(Mode: "${ugMode}")`), `User prompt must include per-subject directive for "${ugMode}"`);
-}
-
-// Verify "No Undergarment Layer" triggers transparent mode & purges unwanted modesty additions
-const noUndergarmentInput = {
+// 3. Verify Prompt Construction has no undergarment control directives
+const testOutfitInput = {
   ...mockMultiImageInput,
   referenceImages: [
     { id: 'subj-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Subject 1', size: 1000 },
   ],
   outfitImages: {
-    'subj-1': { id: 'outfit-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Sheer Mesh Dress', size: 1200 },
-  },
-  outfitLayeringConfigs: {
-    'subj-1': { mode: 'No Undergarment Layer' },
+    'subj-1': { id: 'outfit-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Evening Gown', size: 1200 },
   },
 };
-const checkNoUndergarment = GeminiService.validateOutfitFidelity(
-  'An ultra realistic portrait wearing a sheer mesh dress, with an opaque slip underneath, delicate straps.',
-  noUndergarmentInput
-);
-assert.strictEqual(checkNoUndergarment.isTransparentMode, true);
-assert.strictEqual(checkNoUndergarment.status, 'warning');
-assert.ok(checkNoUndergarment.warnings.some(w => w.includes('lapisan modesty/slip dalam')));
+const testSysInst = service1['buildSystemInstruction'](testOutfitInput);
+assert.ok(!testSysInst.includes('UNDERGARMENT & LAYERING CONTROL MODE:'), 'System instruction must NOT include undergarment mode directives');
 
-const sanitizedNoUndergarment = GeminiService.sanitizeOutfitLayering(
-  'A woman in a sheer black lace gown, with an opaque slip underneath, soft ambient lighting',
-  'No Undergarment Layer'
-);
-assert.strictEqual(sanitizedNoUndergarment, 'A woman in a sheer black lace gown, soft ambient lighting');
+const testUserPrompt = service1['buildUserPrompt'](testOutfitInput);
+assert.ok(!testUserPrompt.includes('Custom Undergarment Instructions'), 'User prompt must NOT include undergarment instructions');
+assert.ok(!testUserPrompt.includes('undergarment layers'), 'User prompt must NOT reference undergarment layers');
 
-const sanitizedNoUndergarmentDirect = GeminiService.sanitizeOutfitLayering(
-  'A woman wearing a sheer dress, opaque slip underneath, delicate straps',
-  'No Undergarment Layer'
-);
-assert.strictEqual(sanitizedNoUndergarmentDirect, 'A woman wearing a sheer dress, delicate straps');
+// 4. Verify Fallback to Subject #1 attire is maintained when no separate outfit uploaded
+const fallbackInput = {
+  ...mockMultiImageInput,
+  referenceImages: [
+    { id: 'subj-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Subject 1', size: 1000 },
+  ],
+  outfitImages: {},
+};
+const fallbackSysInst = service1['buildSystemInstruction'](fallbackInput);
+assert.ok(fallbackSysInst.includes('FALLBACK RULE: You MUST use the attire visibly worn by Subject 1 in Subject Reference 1'), 'Must preserve fallback to subject reference image clothing');
 
-const sanitizedNoUndergarmentBlack = GeminiService.sanitizeOutfitLayering(
-  'A woman in a sheer mesh top, black inner slip, soft lighting',
-  'No Undergarment Layer'
-);
-assert.strictEqual(sanitizedNoUndergarmentBlack, 'A woman in a sheer mesh top, soft lighting');
-
-console.log('✓ Undergarment Control Mode (all 6 modes) verified for Outfit Upload 1.');
+console.log('✓ Undergarment Control Mode removal verified: UI dropdown, priority labels, descriptions, and prompt directives eliminated; upload, preview, and fallback to Subject #1 clothing 100% preserved.');
 
 // 5e. Verify Aspect Ratio Global Enforcement in Prompt Engineering
 console.log('Test 5e: Verify Aspect Ratio in System Instruction & User Prompt...');
@@ -946,8 +922,20 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   // 7b. Verify Global Outfit Prompt Repair
   console.log('Test 7b: Verify Global Outfit Prompt Repair on Mixed Compliant & Flagged Prompts...');
+  const transparentOutfitInput = {
+    ...mockMultiImageInput,
+    referenceImages: [
+      { id: 'subj-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Subject 1', size: 1000 },
+    ],
+    outfitImages: {
+      'subj-1': { id: 'outfit-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Sheer Mesh Dress', size: 1200 },
+    },
+    outfitLayeringConfigs: {
+      'subj-1': { mode: 'Transparent Fabric Preservation' },
+    },
+  };
   const repairInput = {
-    ...noUndergarmentInput,
+    ...transparentOutfitInput,
     selectedAspectRatio: '9:16',
   };
   const compliantPrompt = 'A cinematic 35mm photo of a woman in a sheer black lace gown with delicate straps, natural body drape, soft ambient light --ar 9:16';
@@ -989,8 +977,20 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 }).then(() => {
   // 7c. Verify Individual Per-Card Outfit Prompt Repair
   console.log('Test 7c: Verify Individual Per-Card Outfit Prompt Repair...');
+  const transparentOutfitInput = {
+    ...mockMultiImageInput,
+    referenceImages: [
+      { id: 'subj-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Subject 1', size: 1000 },
+    ],
+    outfitImages: {
+      'subj-1': { id: 'outfit-1', file: {}, dataUrl: 'data:image/jpeg;base64,...', name: 'Sheer Mesh Dress', size: 1200 },
+    },
+    outfitLayeringConfigs: {
+      'subj-1': { mode: 'Transparent Fabric Preservation' },
+    },
+  };
   const repairInput = {
-    ...noUndergarmentInput,
+    ...transparentOutfitInput,
     selectedAspectRatio: '9:16',
   };
   const compliantPrompt = 'A cinematic 35mm photo of a woman in a sheer black lace gown with delicate straps, natural body drape, soft ambient light --ar 9:16';

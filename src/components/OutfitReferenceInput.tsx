@@ -6,11 +6,8 @@ import {
   Trash2,
   AlertCircle,
   Info,
-  CheckCircle2,
-  Filter,
 } from 'lucide-react';
-import { ReferenceImageData, SubjectOutfitConfig, OutfitLayeringMode, UndergarmentControlMode, UNDERGARMENT_CONTROL_MODES } from '../types/index.ts';
-export { UNDERGARMENT_CONTROL_MODES };
+import { ReferenceImageData, SubjectOutfitConfig, OutfitLayeringMode } from '../types/index.ts';
 import { useLanguage } from '../context/LanguageContext';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -39,19 +36,17 @@ export const PER_SUBJECT_OUTFIT_MODES: OutfitLayeringMode[] = [
 interface OutfitReferenceInputProps {
   subjects: ReferenceImageData[];
   outfitImages: Record<string, ReferenceImageData>;
-  subjectOutfitConfigs: Record<string, SubjectOutfitConfig>;
+  subjectOutfitConfigs?: Record<string, SubjectOutfitConfig>;
   onOutfitChange: (subjectId: string, outfit: ReferenceImageData) => void;
   onOutfitRemove: (subjectId: string) => void;
-  onSubjectOutfitConfigChange: (subjectId: string, config: SubjectOutfitConfig) => void;
+  onSubjectOutfitConfigChange?: (subjectId: string, config: SubjectOutfitConfig) => void;
 }
 
 export const OutfitReferenceInput: React.FC<OutfitReferenceInputProps> = ({
   subjects,
   outfitImages,
-  subjectOutfitConfigs,
   onOutfitChange,
   onOutfitRemove,
-  onSubjectOutfitConfigChange,
 }) => {
   const { t } = useLanguage();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -62,24 +57,6 @@ export const OutfitReferenceInput: React.FC<OutfitReferenceInputProps> = ({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
-  const getUndergarmentModeDescription = (mode: UndergarmentControlMode): string => {
-    switch (mode) {
-      case 'Match Outfit':
-        return t.undergarmentModeMatchOutfitDesc;
-      case 'Concealed':
-        return t.undergarmentModeConcealedDesc;
-      case 'No Undergarment Layer':
-        return t.undergarmentModeNoLayerDesc;
-      case 'Editorial Minimal Layering':
-        return t.undergarmentModeEditorialDesc;
-      case 'Custom':
-        return t.undergarmentModeCustomDesc;
-      case 'Preserve':
-      default:
-        return t.undergarmentModePreserveDesc;
-    }
   };
 
   const handleProcessFile = (subjectId: string, file: File) => {
@@ -153,41 +130,50 @@ export const OutfitReferenceInput: React.FC<OutfitReferenceInputProps> = ({
             <Shirt className="w-3.5 h-3.5 text-amber-400" />
             <span>{t.outfitReferenceTitle}</span>
           </label>
-
-          {subjects.length > 0 && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 border border-slate-700/60">
-              {filledCount} / {subjects.length} {t.outfitSlotsFilledBadge}
-            </span>
-          )}
-        </div>
-
         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 self-start sm:self-auto">
           {t.imageOptionalBadge}
         </span>
+        </div>
+
+        {/* Counter Badge */}
+        {subjects.length > 0 && (
+          <div className="flex items-center gap-1.5 self-start sm:self-auto">
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${
+                filledCount > 0
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+            >
+              {filledCount} / {subjects.length} {t.outfitSlotsFilledBadge}
+            </span>
+          </div>
+        )}
       </div>
 
-      <p className="text-[11px] text-slate-400">
+      {/* Subtitle / Explanatory Note */}
+      <p className="text-[11px] text-slate-400 leading-relaxed -mt-1">
         {t.outfitReferenceSubtitle}
       </p>
 
       {/* Validation Error Banner */}
       {validationError && (
-        <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between gap-2 animate-in fade-in">
-          <div className="flex items-center gap-1.5">
+        <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-300 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+          <div className="flex items-center gap-2 min-w-0">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{validationError}</span>
+            <span className="truncate">{validationError}</span>
           </div>
           <button
             type="button"
             onClick={() => setValidationError(null)}
-            className="text-rose-400 hover:text-white text-xs px-1.5 py-0.5 rounded"
+            className="text-rose-400 hover:text-rose-200 text-xs shrink-0 font-medium"
           >
-            ✕
+            Tutup
           </button>
         </div>
       )}
 
-      {/* Case 1: No Subjects Uploaded Yet */}
+      {/* Case 1: No subjects uploaded yet */}
       {subjects.length === 0 && (
         <div className="p-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/30 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
           <Shirt className="w-6 h-6 text-slate-600" />
@@ -197,33 +183,17 @@ export const OutfitReferenceInput: React.FC<OutfitReferenceInputProps> = ({
         </div>
       )}
 
-      {/* Case 2: One Outfit Slot per Uploaded Subject with Independent Per-Subject Control */}
+      {/* Case 2: One Outfit Slot per Uploaded Subject */}
       {subjects.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {subjects.map((subject, idx) => {
             const outfit = outfitImages[subject.id];
             const isDragging = dragOverSubjectId === subject.id;
-            const currentConfig: SubjectOutfitConfig = subjectOutfitConfigs[subject.id] || {
-              mode: 'Automatic',
-              customInstructions: '',
-            };
-
-            // Normalize mode for Undergarment Control (Consistent across all upload slots)
-            let undergarmentMode: UndergarmentControlMode = 'Preserve';
-            if (UNDERGARMENT_CONTROL_MODES.includes(currentConfig.mode as UndergarmentControlMode)) {
-              undergarmentMode = currentConfig.mode as UndergarmentControlMode;
-            } else if (currentConfig.mode === 'Transparent Fabric Preservation') {
-              undergarmentMode = 'No Undergarment Layer';
-            } else if (currentConfig.mode === 'Custom Outfit Instructions') {
-              undergarmentMode = 'Custom';
-            } else {
-              undergarmentMode = 'Preserve';
-            }
 
             return (
               <div
                 key={subject.id}
-                className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between space-y-3.5 hover:border-slate-700/80 transition shadow-sm"
+                className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col space-y-3.5 hover:border-slate-700/80 transition shadow-sm"
               >
                 {/* Hidden File Input for this specific slot */}
                 <input
@@ -355,78 +325,6 @@ export const OutfitReferenceInput: React.FC<OutfitReferenceInputProps> = ({
                     </div>
                   </div>
                 )}
-
-                {/* PER-SUBJECT CONTROL: UNIFIED UNDERGARMENT CONTROL MODE FOR ALL OUTFIT SLOTS */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 space-y-2.5 pt-3">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <Filter className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <label
-                          htmlFor={`undergarment-control-mode-${subject.id}`}
-                          className="text-xs sm:text-sm font-bold text-cyan-400 block cursor-pointer"
-                        >
-                          {t.undergarmentControlTitle}
-                        </label>
-                        <p className="text-[11px] text-slate-300 leading-snug">
-                          {getUndergarmentModeDescription(undergarmentMode)}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          {t.undergarmentPriority}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 w-full sm:w-auto">
-                      <select
-                        id={`undergarment-control-mode-${subject.id}`}
-                        value={undergarmentMode}
-                        onChange={(e) =>
-                          onSubjectOutfitConfigChange(subject.id, {
-                            ...currentConfig,
-                            mode: e.target.value as OutfitLayeringMode,
-                          })
-                        }
-                        className="w-full sm:w-auto min-w-[190px] bg-slate-950 border-2 border-teal-400 focus:border-teal-300 focus:ring-1 focus:ring-teal-400 text-white font-semibold rounded-lg px-3 py-1.5 text-xs outline-none transition cursor-pointer"
-                      >
-                        {UNDERGARMENT_CONTROL_MODES.map((mode) => (
-                          <option key={mode} value={mode} className="bg-slate-900 text-slate-100 font-normal">
-                            {mode}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Special indicator for No Undergarment Layer */}
-                  {undergarmentMode === 'No Undergarment Layer' && (
-                    <div className="px-2 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/30 text-[10px] text-teal-300 font-medium flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3 h-3 text-teal-400 shrink-0" />
-                      <span>Transparansi Terjaga • Bebas Lapisan Modesty</span>
-                    </div>
-                  )}
-
-                  {/* Custom Undergarment Instructions field */}
-                  {undergarmentMode === 'Custom' && (
-                    <div className="space-y-1 pt-1 border-t border-slate-800">
-                      <label className="text-[11px] font-semibold text-cyan-300 block">
-                        {t.outfitCustomInstructionsLabel}
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={currentConfig.customInstructions || ''}
-                        onChange={(e) =>
-                          onSubjectOutfitConfigChange(subject.id, {
-                            ...currentConfig,
-                            customInstructions: e.target.value,
-                          })
-                        }
-                        placeholder={t.undergarmentCustomPlaceholder}
-                        className="w-full bg-slate-950 border border-teal-500/50 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-500 transition outline-none resize-y"
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
             );
           })}

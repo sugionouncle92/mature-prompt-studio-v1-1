@@ -119,16 +119,7 @@ export const translations = {
     transparentRuleStructure: 'Pemisahan Struktur: Membedakan panel desain/jahitan bawaan dari lapisan dalam.',
     transparentRuleAllVariations: 'Konsistensi 100% Variasi: Diterapkan & disanitasi secara konsisten ke seluruh variasi prompt.',
 
-    // Undergarment Control (for Outfit Upload 1)
-    undergarmentControlTitle: 'Undergarment Control Mode:',
-    undergarmentPriority: 'Prioritas: Clothing Lock > Undergarment Control',
-    undergarmentModePreserveDesc: 'Mempertahankan pakaian dalam / lapisan pakaian asli dari reference image.',
-    undergarmentModeMatchOutfitDesc: 'Menyesuaikan pakaian dalam agar serasi dengan gaya, warna, dan material outfit referensi.',
-    undergarmentModeConcealedDesc: 'Menyembunyikan lapisan pakaian dalam agar tampak seamless tanpa garis tepi yang mengganggu.',
-    undergarmentModeNoLayerDesc: 'Tanpa lapisan pakaian dalam tambahan; mempertahankan busana sheer/transparan tetap unlined sesuai referensi.',
-    undergarmentModeEditorialDesc: 'Gaya layering minimalis editorial fashion dengan siluet bersih dan busana transparan autentik.',
-    undergarmentModeCustomDesc: 'Gunakan instruksi kustom pengguna untuk susunan pakaian dalam dan layering.',
-    undergarmentCustomPlaceholder: 'Tuliskan preferensi pakaian dalam khusus untuk subjek ini...',
+
 
     // Story Style
     storyStyleTitle: 'Story Style Selector',
@@ -566,16 +557,7 @@ export const translations = {
     transparentRuleStructure: 'Structural Separation: Distinguishes integral design panels and seams from inner layers.',
     transparentRuleAllVariations: '100% Variation Consistency: Consistently enforced & sanitized across all generated prompt variations.',
 
-    // Undergarment Control (for Outfit Upload 1)
-    undergarmentControlTitle: 'Undergarment Control Mode:',
-    undergarmentPriority: 'Priority: Clothing Lock > Undergarment Control',
-    undergarmentModePreserveDesc: 'Preserve original undergarments / clothing layers from the reference image.',
-    undergarmentModeMatchOutfitDesc: 'Match undergarments to the style, color palette, and materials of the outfit reference.',
-    undergarmentModeConcealedDesc: 'Conceal undergarment layers seamlessly without distracting visible lines or peeking edges.',
-    undergarmentModeNoLayerDesc: 'No extra undergarments or modesty linings; keeps sheer/mesh garments unlined as shown in reference.',
-    undergarmentModeEditorialDesc: 'Editorial minimal layering aesthetic with clean silhouettes and authentic fabric transparency.',
-    undergarmentModeCustomDesc: 'Use custom user instructions for undergarments and layering.',
-    undergarmentCustomPlaceholder: 'Enter custom undergarment preferences for this subject...',
+
 
     // Story Style
     storyStyleTitle: 'Story Style Selector',

@@ -99,10 +99,7 @@ const StudioContent: React.FC = () => {
       if (savedMode && validModes.includes(savedMode as OutfitLayeringMode)) {
         return { mode: savedMode as OutfitLayeringMode, customInstructions: savedCustom };
       }
-      const legacyUndergarment = localStorage.getItem('mature_prompt_studio_undergarment_control');
-      if (legacyUndergarment) {
-        return { mode: 'Automatic', customInstructions: '' };
-      }
+
     } catch {
       // fallback to default
     }
