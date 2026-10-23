@@ -39,6 +39,24 @@ export interface PhotographicStyleSelection {
   custom: string;
 }
 
+export interface CustomPhotographicStyle {
+  id: string;
+  name: string;
+  description?: string;
+  promptDirective: string;
+  enabled: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface CustomPhotographicStylesExportFile {
+  format: 'mature-prompt-custom-photographic-styles';
+  version: number;
+  exportedAt?: string;
+  totalStyles?: number;
+  styles: CustomPhotographicStyle[];
+}
+
 export interface CharacterLocksState {
   facelock: boolean; // /facelock 100%
   bodyshape: boolean; // /bodyshape lock
@@ -199,6 +217,7 @@ export interface GenerationInput {
   photographicStyle: PhotographicStyleSelection;
   characterLocks: CharacterLocksState;
   customLocks?: CustomCharacterLock[];
+  customPhotographicStyles?: CustomPhotographicStyle[];
   variationCount: number;
   selectedAspectRatio?: string;
   referenceImage?: ReferenceImageData | null;

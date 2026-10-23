@@ -23,6 +23,12 @@ import {
   DEFAULT_PHOTOGRAPHIC_STYLES,
   getActivePhotographicShorthands,
   getActivePhotographicDirectives,
+  STORAGE_KEY_CUSTOM_PHOTOGRAPHIC_STYLES,
+  validateCustomPhotographicStyle,
+  loadCustomPhotographicStylesFromStorage,
+  saveCustomPhotographicStylesToStorage,
+  exportCustomPhotographicStylesToJson,
+  validateImportPhotographicStylesJson,
 } from '../src/data/photographicStyles.ts';
 import { GeminiService } from '../src/services/geminiService.ts';
 import { translations } from '../src/i18n/translations.ts';
@@ -2243,7 +2249,223 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
 
   console.log('✓ Custom Character Locks verified: CRUD, localStorage, export JSON, import parsing & validation, conflict detection, append vs replace modes, prompt generator integration, preset compatibility, and Reset Default isolation.');
 
-  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (20/20) ---');
+
+  // =========================================================================
+  // TEST 21: CUSTOM PHOTOGRAPHIC STYLES (STRICT SEPARATION & SAFE PATCH)
+  // =========================================================================
+  console.log('\n--- Test 21: Custom Photographic Styles & Strict Separation ---');
+
+  // 21a. Storage Namespacing & Strict Separation from Character Locks
+  assert.strictEqual(
+    STORAGE_KEY_CUSTOM_PHOTOGRAPHIC_STYLES,
+    'mature_prompt_studio_custom_photo_styles_v1',
+    'Custom Photographic Styles must use its own distinct storage key'
+  );
+  assert.notStrictEqual(
+    STORAGE_KEY_CUSTOM_PHOTOGRAPHIC_STYLES,
+    STORAGE_KEY_CUSTOM_CHARACTER_LOCKS,
+    'Custom Photographic Styles and Custom Character Locks MUST NEVER share storage keys'
+  );
+
+  // 21b. Validation Rules
+  const existingTestPhotoStyles = [
+    {
+      id: 'custom-photo-1',
+      name: 'Moody Neon Noir',
+      description: 'High contrast wet streets with magenta and cyan neon reflection',
+      promptDirective: 'Cinematic neo-noir aesthetics, 35mm anamorphic lens, high contrast, wet pavement reflections, cyan and magenta neon rims.',
+      enabled: true,
+      createdAt: 1000,
+      updatedAt: 1000,
+    },
+  ];
+
+  // Empty name validation
+  const emptyNameVal = validateCustomPhotographicStyle({ name: '', promptDirective: 'Camera 50mm' }, existingTestPhotoStyles);
+  assert.strictEqual(emptyNameVal.valid, false, 'Should reject empty style name');
+  assert.strictEqual(emptyNameVal.field, 'name');
+
+  // Empty directive validation
+  const emptyDirectiveVal = validateCustomPhotographicStyle({ name: 'Vintage 1970s', promptDirective: '' }, existingTestPhotoStyles);
+  assert.strictEqual(emptyDirectiveVal.valid, false, 'Should reject empty prompt directive');
+  assert.strictEqual(emptyDirectiveVal.field, 'promptDirective');
+
+  // Collision with built-in photographic style (e.g., 'Nyata', 'Photorealistic', 'Ultra Realistic')
+  const builtinCollisionVal = validateCustomPhotographicStyle({ name: 'Nyata', promptDirective: 'Ultra real photo' }, existingTestPhotoStyles);
+  assert.strictEqual(builtinCollisionVal.valid, false, 'Should reject name colliding with built-in style Nyata');
+  assert.ok(builtinCollisionVal.error.includes('gaya fotografi bawaan'), 'Collision error must mention built-in style');
+
+  const builtinCaseInsensitiveVal = validateCustomPhotographicStyle({ name: 'photoREALISTIC', promptDirective: 'Ultra real photo' }, existingTestPhotoStyles);
+  assert.strictEqual(builtinCaseInsensitiveVal.valid, false, 'Should reject case-insensitive name colliding with built-in Photorealistic');
+
+  // Collision with existing custom style
+  const customCollisionVal = validateCustomPhotographicStyle({ name: 'moody neon noir', promptDirective: 'Different directive' }, existingTestPhotoStyles);
+  assert.strictEqual(customCollisionVal.valid, false, 'Should reject duplicate custom style name');
+
+  // Editing self should NOT trigger collision
+  const editingSelfVal = validateCustomPhotographicStyle(
+    { name: 'Moody Neon Noir', promptDirective: 'Updated directive', id: 'custom-photo-1' },
+    existingTestPhotoStyles,
+    'custom-photo-1'
+  );
+  assert.strictEqual(editingSelfVal.valid, true, 'Editing existing style with same name should pass');
+
+  // Valid new custom style
+  const validNewStyleVal = validateCustomPhotographicStyle(
+    { name: 'Kodachrome 64 Warmth', promptDirective: 'Shot on 35mm Kodachrome 64 film, warm golden hour palette, fine organic grain, f/1.8.' },
+    existingTestPhotoStyles
+  );
+  assert.strictEqual(validNewStyleVal.valid, true, 'Valid new custom photographic style should pass validation');
+
+  // 21c. JSON Export Format & Structure
+  const exportedJsonStr = exportCustomPhotographicStylesToJson(existingTestPhotoStyles);
+  assert.ok(typeof exportedJsonStr === 'string', 'Export must return a JSON string');
+  const parsedPhotoExport = JSON.parse(exportedJsonStr);
+  assert.strictEqual(parsedPhotoExport.format, 'mature-prompt-custom-photographic-styles', 'Export format must be mature-prompt-custom-photographic-styles');
+  assert.strictEqual(parsedPhotoExport.version, 1, 'Export version must be 1');
+  assert.strictEqual(parsedPhotoExport.totalStyles, 1, 'totalStyles count must be accurate');
+  assert.strictEqual(Array.isArray(parsedPhotoExport.styles), true, 'styles field must be an array');
+  assert.strictEqual(parsedPhotoExport.styles[0].name, 'Moody Neon Noir');
+
+  // 21d. JSON Import Validation & Rejection of Foreign Files
+  // STRICT SEPARATION: Importing Character Locks JSON into Photographic Styles must be rejected!
+  const charLockExportSample = JSON.stringify({
+    format: 'mature-prompt-custom-character-locks',
+    version: 1,
+    exportedAt: '2026-10-23T10:00:00.000Z',
+    totalLocks: 1,
+    locks: [{ id: 'cl-1', name: 'Face Lock', shorthand: '/facelock', instruction: 'Keep face same', enabled: true }],
+  });
+  const rejectCharLockResult = validateImportPhotographicStylesJson(charLockExportSample, existingTestPhotoStyles);
+  assert.strictEqual(rejectCharLockResult.valid, false, 'Importing character locks JSON into photo styles MUST be rejected');
+  assert.ok(rejectCharLockResult.errors.some(e => e.includes('Format file salah') || e.includes('mature-prompt-custom-photographic-styles')), 'Must give descriptive format error when importing character locks');
+
+  // Rejection of invalid JSON
+  const invalidJsonPhotoResult = validateImportPhotographicStylesJson('{ not a json }', existingTestPhotoStyles);
+  assert.strictEqual(invalidJsonPhotoResult.valid, false, 'Malformed JSON must be rejected');
+
+  // Successful import validation with conflict detection
+  const importPayloadSample = JSON.stringify({
+    format: 'mature-prompt-custom-photographic-styles',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    totalStyles: 3,
+    styles: [
+      {
+        id: 'custom-photo-1',
+        name: 'Moody Neon Noir',
+        promptDirective: 'Updated directive via import',
+        enabled: true,
+      },
+      {
+        id: 'custom-photo-2',
+        name: 'Nyata', // Conflicts with built-in!
+        promptDirective: 'Invalid conflict',
+        enabled: true,
+      },
+      {
+        id: 'custom-photo-3',
+        name: 'Kodachrome 64 Warmth',
+        promptDirective: 'Shot on 35mm Kodachrome 64 film, warm golden hour palette, fine organic grain, f/1.8.',
+        enabled: true,
+      },
+    ],
+  });
+
+  const importPhotoResult = validateImportPhotographicStylesJson(importPayloadSample, existingTestPhotoStyles);
+  assert.strictEqual(importPhotoResult.validEntries.length, 2, 'Only 2 valid non-colliding entries should be accepted (Nyata excluded)');
+  assert.strictEqual(importPhotoResult.conflicts.length, 1, 'Should detect conflict with existing custom style');
+  assert.strictEqual(importPhotoResult.invalidEntriesCount, 1, '1 invalid entry (builtin collision) detected');
+  assert.strictEqual(importPhotoResult.valid, false, 'Entire batch with 1 invalid entry should have valid=false');
+
+  // Completely clean import payload with valid=true
+  const cleanImportPayload = JSON.stringify({
+    format: 'mature-prompt-custom-photographic-styles',
+    version: 1,
+    totalStyles: 1,
+    styles: [
+      {
+        id: 'clean-photo-1',
+        name: 'Fine Grain Monochrome',
+        promptDirective: 'Black and white analog tri-x 400 grain, high microcontrast, deep rich blacks.',
+        enabled: true,
+      },
+    ],
+  });
+  const cleanImportResult = validateImportPhotographicStylesJson(cleanImportPayload, existingTestPhotoStyles);
+  assert.strictEqual(cleanImportResult.valid, true, 'Clean import without any errors should have valid=true');
+  assert.strictEqual(cleanImportResult.validEntries.length, 1);
+
+  // 21e. Prompt Construction Integration in GeminiService
+  const testInputWithCustomPhoto = {
+    samplePrompt: 'A sensual elegant woman standing by the grand arched window overlooking misty rainy city',
+    keywords: 'warm ambient indoor glow',
+    storyStyle: { primary: null, supporting: [], custom: '' },
+    photographicStyle: {
+      selected: ['Nyata', 'Photorealistic'],
+      custom: 'Cinematic 35mm Vintage',
+    },
+    characterLocks: { ...DEFAULT_CHARACTER_LOCKS },
+    customPhotographicStyles: [
+      {
+        id: 'custom-photo-active',
+        name: 'Moody Neon Noir',
+        promptDirective: 'High contrast wet streets with magenta and cyan neon reflections, shallow depth of field, anamorphic bokeh.',
+        enabled: true,
+      },
+      {
+        id: 'custom-photo-inactive',
+        name: 'Harsh Daylight Flash',
+        promptDirective: 'Direct direct camera flash with heavy dark drop shadows.',
+        enabled: false,
+      },
+    ],
+    variationCount: 2,
+    selectedAspectRatio: '9:16',
+  };
+
+  const photoGeminiService = GeminiService.getInstance();
+  const sysInstructionWithCustomPhoto = photoGeminiService.buildSystemInstruction(testInputWithCustomPhoto);
+  assert.ok(sysInstructionWithCustomPhoto.includes('CUSTOM PHOTOGRAPHIC RENDERING STYLES:'), 'System instruction must include CUSTOM PHOTOGRAPHIC RENDERING STYLES section');
+  assert.ok(sysInstructionWithCustomPhoto.includes('- Moody Neon Noir: High contrast wet streets with magenta and cyan neon reflections'), 'Active custom photographic style directive must be in system instruction');
+  assert.ok(!sysInstructionWithCustomPhoto.includes('Harsh Daylight Flash'), 'Inactive custom photographic style must NOT be in system instruction');
+
+  const userPromptWithCustomPhoto = photoGeminiService.buildUserPrompt(testInputWithCustomPhoto);
+  assert.ok(userPromptWithCustomPhoto.includes('- Moody Neon Noir: High contrast wet streets with magenta and cyan neon reflections'), 'Active custom photographic style must be injected into user prompt');
+  assert.ok(!userPromptWithCustomPhoto.includes('Harsh Daylight Flash'), 'Inactive custom photographic style must NOT be in user prompt');
+
+  // 21f. PhotographicStyleSelector Component Source Checks
+  const photoSelectorSrc = fs.readFileSync('src/components/PhotographicStyleSelector.tsx', 'utf8');
+  assert.ok(photoSelectorSrc.includes('STORAGE_KEY_CUSTOM_PHOTOGRAPHIC_STYLES'), 'PhotographicStyleSelector.tsx must reference STORAGE_KEY_CUSTOM_PHOTOGRAPHIC_STYLES');
+  assert.ok(photoSelectorSrc.includes('handleExportCustomPhotoStyles'), 'PhotographicStyleSelector.tsx must implement handleExportCustomPhotoStyles');
+  assert.ok(photoSelectorSrc.includes('handleConfirmImport'), 'PhotographicStyleSelector.tsx must implement handleConfirmImport');
+  assert.ok(photoSelectorSrc.includes('mature-prompt-custom-photographic-styles'), 'PhotographicStyleSelector.tsx must export to mature-prompt-custom-photographic-styles');
+  assert.ok(photoSelectorSrc.includes('t.btnAddCustomPhotoStyle'), 'PhotographicStyleSelector.tsx must render Add Custom Photo Style button');
+  assert.ok(photoSelectorSrc.includes('t.btnExportCustomPhotoStyles'), 'PhotographicStyleSelector.tsx must render Export button');
+  assert.ok(photoSelectorSrc.includes('t.btnImportCustomPhotoStyles'), 'PhotographicStyleSelector.tsx must render Import button');
+
+  // 21g. Verify Reset Default Isolation
+  const photoResetDefaultStart = photoSelectorSrc.indexOf('const handleResetDefault = () => {');
+  assert.ok(photoResetDefaultStart !== -1, 'handleResetDefault must exist in PhotographicStyleSelector.tsx');
+  const photoResetDefaultEnd = photoSelectorSrc.indexOf('};', photoResetDefaultStart);
+  const photoResetDefaultBody = photoSelectorSrc.substring(photoResetDefaultStart, photoResetDefaultEnd);
+  assert.ok(photoResetDefaultBody.includes('selected: [...DEFAULT_PHOTOGRAPHIC_STYLES]'), 'handleResetDefault must restore DEFAULT_PHOTOGRAPHIC_STYLES');
+  assert.ok(photoResetDefaultBody.includes("custom: ''"), 'handleResetDefault must clear custom text input');
+  assert.ok(!photoResetDefaultBody.includes('setInternalCustomStyles([])'), 'handleResetDefault must NOT clear customStyles');
+  assert.ok(!photoResetDefaultBody.includes('updateCustomStyles([])'), 'handleResetDefault must NOT delete customStyles');
+  assert.ok(!photoResetDefaultBody.includes('characterLocks'), 'handleResetDefault must NEVER touch characterLocks');
+  assert.ok(!photoResetDefaultBody.includes('customLocks'), 'handleResetDefault must NEVER touch customLocks');
+
+  // 21h. Verify App.tsx Integration
+  const appSrc3 = fs.readFileSync('src/App.tsx', 'utf8');
+  assert.ok(appSrc3.includes('customStyles={customPhotoStyles}'), 'App.tsx must pass customStyles to PhotographicStyleSelector');
+  assert.ok(appSrc3.includes('onCustomStylesChange={setCustomPhotoStyles}'), 'App.tsx must pass onCustomStylesChange to PhotographicStyleSelector');
+  assert.ok(appSrc3.includes('customPhotographicStyles: customPhotoStyles,'), 'App.tsx must pass customPhotographicStyles to generationInput');
+
+  console.log('✓ Custom Photographic Styles verified: CRUD validation, local storage isolation, export JSON, import parsing & validation, conflict detection, append vs replace modes, prompt generator integration, and Reset Default isolation.');
+
+  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (21/21) ---');
+
 }).catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);

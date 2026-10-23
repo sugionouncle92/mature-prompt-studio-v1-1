@@ -1,4 +1,4 @@
-import type { GenerationInput, PromptResult, OutfitFidelityCheck, PromptRepairSummary, CustomCharacterLock } from '../types/index.ts';
+import type { GenerationInput, PromptResult, OutfitFidelityCheck, PromptRepairSummary, CustomCharacterLock, CustomPhotographicStyle } from '../types/index.ts';
 import {
   getStyleVisualDirective,
   getMatureSubstyleByName,
@@ -335,6 +335,43 @@ export class GeminiService {
       })
     );
 
+    const activeCustomPhoto = (input.customPhotographicStyles || [])
+      .filter((s) => s && s.enabled && s.promptDirective && s.promptDirective.trim());
+
+    // Deterministically integrate active custom photographic style directives
+    const finalizedWithPhotoPrompts = withShorthandsPrompts.map((p) => {
+      let promptText = p;
+      if (activeCustomPhoto.length === 0) return promptText;
+
+      let cleanPrompt = promptText.trim();
+      let trailingAr = '';
+      const arMatch = cleanPrompt.match(/(?:--ar|--aspect-ratio)[:\s]+(\d+(?::\d+|\.\d+)?)\s*$/i);
+      if (arMatch) {
+        trailingAr = `--ar ${arMatch[1]}`;
+        cleanPrompt = cleanPrompt.slice(0, arMatch.index).trim();
+        if (cleanPrompt.endsWith(',')) {
+          cleanPrompt = cleanPrompt.slice(0, -1).trim();
+        }
+      }
+
+      const missingPhotoDirectives = activeCustomPhoto.filter((cs) => {
+        const prefix = cs.name.toLowerCase();
+        return !cleanPrompt.toLowerCase().includes(prefix);
+      });
+
+      if (missingPhotoDirectives.length === 0) {
+        return promptText;
+      }
+
+      const photoDirectivesText = missingPhotoDirectives
+        .map((cs) => `${cs.name}: ${cs.promptDirective.trim()}`)
+        .join('. ') + '.';
+      const separator = cleanPrompt.endsWith('.') ? ' ' : '. ';
+      const combined = `${cleanPrompt}${separator}${photoDirectivesText}`.replace(/\.{2,}/g, '.').trim();
+
+      return trailingAr ? `${combined} ${trailingAr}` : combined;
+    });
+
     const activeCustomTags = (input.customLocks || [])
       .filter((l) => l && l.enabled && l.shorthand && l.shorthand.trim())
       .map((l) => l.shorthand.trim());
@@ -345,7 +382,7 @@ export class GeminiService {
       ...getActivePhotographicShorthands(input.photographicStyle.selected),
     ];
 
-    return withShorthandsPrompts.map((p, idx) => ({
+    return finalizedWithPhotoPrompts.map((p, idx) => ({
       id: `prompt-${Date.now()}-${idx}`,
       index: idx + 1,
       prompt: p,
@@ -1179,6 +1216,7 @@ PRIORITY OF SOURCES & CONFLICT RESOLUTION:
 7. User's compatible textual instructions (if custom instructions provided).
 8. Creative variations in scene framing, pose, lighting, and mood (applied within the boundaries of the preserved and modified attributes).
 
+${this.buildCustomPhotoStylesInstruction(input.customPhotographicStyles)}
 CHARACTER LOCKS ENFORCEMENT:
 Treat all active locks as hard prompt constraints:
 ${this.buildLocksInstruction(input.characterLocks, input.customLocks)}
@@ -1187,6 +1225,21 @@ VARIATIONS DIVERSITY:
 - Each variation must create meaningful differences through actions, gestures, emotional beats, character interaction, timing, environmental blocking, and composition.
 - Do NOT simply swap synonyms (e.g. replacing 'beautiful' with 'attractive').
 - Maintain core identity, active locks, and selected Story Style consistently across all variations.`;
+  }
+
+  private buildCustomPhotoStylesInstruction(
+    customStyles?: CustomPhotographicStyle[]
+  ): string {
+    if (!Array.isArray(customStyles)) return '';
+    const active = customStyles.filter(
+      (s) => s && s.enabled && s.promptDirective && s.promptDirective.trim()
+    );
+    if (active.length === 0) return '';
+    return `CUSTOM PHOTOGRAPHIC RENDERING STYLES:
+Apply these custom photographic rendering directives consistently across all variations:
+${active.map((s) => `- ${s.name}: ${s.promptDirective.trim()}`).join('\n')}
+
+`;
   }
 
   private buildLocksInstruction(
@@ -1352,6 +1405,16 @@ VARIATIONS DIVERSITY:
         );
       }
     }
+    const activeCustomPhoto = (input.customPhotographicStyles || [])
+      .filter((s) => s && s.enabled && s.promptDirective && s.promptDirective.trim());
+    if (activeCustomPhoto.length > 0) {
+      photoParts.push(
+        `Active Custom Photographic Style Directives:\n${activeCustomPhoto
+          .map((s) => `- ${s.name}: ${s.promptDirective.trim()}`)
+          .join('\n')}`
+      );
+    }
+
     if (photoParts.length > 0) {
       parts.push(`\n[PHOTOGRAPHIC RENDERING STYLES]:\n${photoParts.join('\n')}`);
     }

@@ -31,10 +31,15 @@ import {
   OutfitLayeringMode,
   SubjectOutfitConfig,
   CustomCharacterLock,
+  CustomPhotographicStyle,
 } from './types/index.ts';
 import { GeminiService } from './services/geminiService.ts';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
-import { DEFAULT_PHOTOGRAPHIC_STYLES } from './data/photographicStyles.ts';
+import {
+  DEFAULT_PHOTOGRAPHIC_STYLES,
+  loadCustomPhotographicStylesFromStorage,
+  saveCustomPhotographicStylesToStorage,
+} from './data/photographicStyles.ts';
 import { loadCustomLocksFromStorage, saveCustomLocksToStorage } from './data/characterLocks.ts';
 
 const STORAGE_KEY_API = 'mature_prompt_studio_api_key';
@@ -189,6 +194,15 @@ const StudioContent: React.FC = () => {
   useEffect(() => {
     saveCustomLocksToStorage(customLocks);
   }, [customLocks]);
+
+  // Custom Photographic Styles State (Strict independent system)
+  const [customPhotoStyles, setCustomPhotoStyles] = useState<CustomPhotographicStyle[]>(() =>
+    loadCustomPhotographicStylesFromStorage()
+  );
+
+  useEffect(() => {
+    saveCustomPhotographicStylesToStorage(customPhotoStyles);
+  }, [customPhotoStyles]);
 
   // Variations & Aspect Ratio (Default: 9:16)
   const [variationConfig, setVariationConfig] = useState<VariationConfig>({
@@ -406,6 +420,7 @@ const StudioContent: React.FC = () => {
       keywords,
       storyStyle,
       photographicStyle,
+      customPhotographicStyles: customPhotoStyles,
       characterLocks,
       customLocks,
       variationCount: targetCount,
@@ -564,6 +579,8 @@ const StudioContent: React.FC = () => {
         <PhotographicStyleSelector
           selection={photographicStyle}
           onChange={setPhotographicStyle}
+          customStyles={customPhotoStyles}
+          onCustomStylesChange={setCustomPhotoStyles}
         />
 
         {/* 4. Camera Framing & Shot Composition */}
