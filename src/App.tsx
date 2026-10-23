@@ -396,7 +396,6 @@ const StudioContent: React.FC = () => {
     };
 
     setIsLoading(true);
-    setResults([]);
 
     try {
       const geminiService = GeminiService.getInstance();

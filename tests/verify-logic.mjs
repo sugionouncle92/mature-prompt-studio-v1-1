@@ -1841,8 +1841,141 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
   assert.strictEqual(translations.en.emptyPresetsTitle, 'No saved presets yet.');
 
   console.log('✓ Character Lock Presets verified: Empty initial state, zero built-ins, clean migration, manual user creation, 14-toggle fidelity, prompt generator integration, and responsive UI.');
+}).then(() => {
+  // 18. Verify Strict User Intent & Targeted Prompt Modification (A → B)
+  console.log('Test 18: Verify Strict User Intent & Targeted Prompt Modification (A → B)...');
+  const gemini = GeminiService.getInstance();
 
-  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (17/17) ---');
+  const mockBothInput = {
+    samplePrompt: 'A realistic 29-year-old Japanese woman with shoulder-length wavy black hair, wearing an elegant navy tailored business suit, standing in a brightly lit modern office lobby, candid 85mm portrait.',
+    keywords: 'Ganti pakaian menjadi setelan formal hitam, ubah latar menjadi kamar hotel mewah temaram.',
+    storyStyle: {
+      primary: 'Mature & Sensual',
+      matureSubstyle: 'Soft Sensuality',
+      matureIntensity: 'Soft',
+      supporting: [],
+      custom: '',
+    },
+    photographicStyle: {
+      selected: ['Ultra Realistic'],
+      custom: '',
+    },
+    characterLocks: {
+      facelock: true,
+      bodyshape: true,
+      outfitlock: false,
+      poselock: false,
+      agepreserve: true,
+      expressionlock: false,
+      hairlock: true,
+    },
+    variationCount: 2,
+    selectedAspectRatio: '9:16',
+  };
+
+  // 18a. Verify System Instruction Mandates
+  const sysInstruction = gemini['buildSystemInstruction'](mockBothInput);
+  assert.ok(
+    sysInstruction.includes('TARGETED PROMPT MODIFICATION (A → B) & STRICT USER INTENT MANDATE'),
+    'Must include Targeted Prompt Modification section in System Instruction'
+  );
+  assert.ok(
+    sysInstruction.includes('When both [PROMPT SAMPLE] and [KEYWORDS / SCENE IDEA] are provided, treat [KEYWORDS / SCENE IDEA] as DIRECT, TARGETED MODIFICATION INSTRUCTIONS'),
+    'Must explicitly state A -> B targeted modification rule'
+  );
+  assert.ok(
+    sysInstruction.includes('STRICT UNREQUESTED PRESERVATION (MINIMAL CHANGE PRINCIPLE)'),
+    'Must enforce Minimal Change principle'
+  );
+  assert.ok(
+    sysInstruction.includes('CLEAN CONFLICT RESOLUTION & REMOVAL'),
+    'Must enforce clean conflict removal'
+  );
+  assert.ok(
+    sysInstruction.includes('STRICT USER INTENT & NO UNNECESSARY CENSORSHIP'),
+    'Must mandate No Unnecessary Censorship'
+  );
+  assert.ok(
+    sysInstruction.includes('1. Explicit Targeted Modifications in Column B ([KEYWORDS / SCENE IDEA]) applied to [PROMPT SAMPLE]'),
+    'Column B modifications must be priority #1 in source resolution'
+  );
+
+  // 18b. Verify User Prompt Builder with Both Inputs
+  const userPromptBoth = gemini['buildUserPrompt'](mockBothInput);
+  assert.ok(
+    userPromptBoth.includes('[PROMPT SAMPLE (Source of Truth for Scene & Identity)]'),
+    'Must include Prompt Sample header'
+  );
+  assert.ok(
+    userPromptBoth.includes('[KEYWORDS / SCENE IDEA]'),
+    'Must include Keywords header'
+  );
+  assert.ok(
+    userPromptBoth.includes('[TARGETED MODIFICATION MANDATE (A → B) & STRICT USER INTENT]'),
+    'Must include Targeted Modification Mandate when both inputs are provided'
+  );
+  assert.ok(
+    userPromptBoth.includes('Column B [KEYWORDS / SCENE IDEA] contains DIRECT MODIFICATION INSTRUCTIONS for Column A [PROMPT SAMPLE].'),
+    'Must instruct model that Column B directs modifications to Column A'
+  );
+  assert.ok(
+    userPromptBoth.includes('TARGETED MODIFICATION ONLY: Change ONLY the specific attributes explicitly requested'),
+    'Must restrict changes only to targeted attributes'
+  );
+  assert.ok(
+    userPromptBoth.includes('STRICT PRESERVATION (MINIMAL CHANGE): Strictly preserve all unrequested details'),
+    'Must mandate retention of unrequested details'
+  );
+  assert.ok(
+    userPromptBoth.includes('NO UNNECESSARY CENSORSHIP: Execute the user\'s exact intent without softening'),
+    'Must prohibit unnecessary censorship in user prompt directive'
+  );
+
+  // 18c. Verify User Prompt Builder with Sample Only (No A -> B mandate)
+  const mockSampleOnlyInput = {
+    ...mockBothInput,
+    keywords: '',
+  };
+  const userPromptSampleOnly = gemini['buildUserPrompt'](mockSampleOnlyInput);
+  assert.ok(
+    userPromptSampleOnly.includes('[PROMPT SAMPLE (Source of Truth for Scene & Identity)]'),
+    'Sample-only mode must include Prompt Sample'
+  );
+  assert.ok(
+    !userPromptSampleOnly.includes('[KEYWORDS / SCENE IDEA]'),
+    'Sample-only mode must not include Keywords block'
+  );
+  assert.ok(
+    !userPromptSampleOnly.includes('[TARGETED MODIFICATION MANDATE (A → B) & STRICT USER INTENT]'),
+    'Sample-only mode must not trigger A -> B modification mandate'
+  );
+
+  // 18d. Verify User Prompt Builder with Keywords Only (Ideation mode)
+  const mockKeywordsOnlyInput = {
+    ...mockBothInput,
+    samplePrompt: '',
+  };
+  const userPromptKeywordsOnly = gemini['buildUserPrompt'](mockKeywordsOnlyInput);
+  assert.ok(
+    !userPromptKeywordsOnly.includes('[PROMPT SAMPLE (Source of Truth for Scene & Identity)]'),
+    'Keywords-only mode must not include Prompt Sample'
+  );
+  assert.ok(
+    userPromptKeywordsOnly.includes('[KEYWORDS / SCENE IDEA]'),
+    'Keywords-only mode must include Keywords'
+  );
+  assert.ok(
+    !userPromptKeywordsOnly.includes('[TARGETED MODIFICATION MANDATE (A → B) & STRICT USER INTENT]'),
+    'Keywords-only mode must not trigger A -> B modification mandate'
+  );
+
+  // 18e. Verify App.tsx preserves previous results on failure
+  const appCode = fs.readFileSync('src/App.tsx', 'utf8');
+  assert.ok(!appCode.includes('setIsLoading(true);\n    setResults([]);'), 'Must not clear results before try block in handleGenerate');
+
+  console.log('✓ Strict User Intent & Targeted Prompt Modification (A → B) verified: System instruction, user prompt builder, minimal change enforcement, and failure safety.');
+
+  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (18/18) ---');
 }).catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);

@@ -1128,14 +1128,51 @@ ${isNyata ? `${NYATA_PROMPT_DIRECTIVE}` : ''}
 
 ${layeringDirective}
 
+TARGETED PROMPT MODIFICATION (A → B) & STRICT USER INTENT MANDATE (MINIMAL CHANGE & NO UNNECESSARY CENSORSHIP):
+- DUAL INPUT LOGIC (SAMPLE A + INSTRUCTIONS B):
+  * When both [PROMPT SAMPLE] and [KEYWORDS / SCENE IDEA] are provided, treat [KEYWORDS / SCENE IDEA] as DIRECT, TARGETED MODIFICATION INSTRUCTIONS applied to [PROMPT SAMPLE].
+  * Column B is NOT merely additional keywords, and NOT a license to rewrite the entire scene freely.
+  * STEP-BY-STEP TARGETED ATTRIBUTE MODIFICATION:
+    1. Read the entire source prompt from [PROMPT SAMPLE].
+    2. Read the modification instructions from [KEYWORDS / SCENE IDEA].
+    3. Explicitly identify which attributes are requested to be changed, removed, added, or preserved (e.g. clothing/outfit, background/setting, pose, lighting, atmosphere).
+    4. Modify ONLY the parts within the exact scope of the user's instructions.
+    5. Cleanly adjust directly related sentences so the resulting prompt is natural, coherent, and free of contradictions.
+    6. Strictly preserve all other details from [PROMPT SAMPLE] to the maximum extent.
+  * CLEAN CONFLICT RESOLUTION & REMOVAL:
+    - Never retain old descriptions that directly contradict the new instructions (e.g. if the user says "Ganti pakaian menjadi setelan formal hitam", cleanly remove the original clothing description so there is no conflicting or duplicate garment).
+    - If the user explicitly asks to remove an attribute (e.g. "Hapus deskripsi pakaian"), cleanly remove that attribute description from the prompt without automatically fabricating a replacement or altering other attributes.
+  * STRICT UNREQUESTED PRESERVATION (MINIMAL CHANGE PRINCIPLE):
+    - By default, strictly preserve all details of the source prompt that are NOT explicitly requested to change:
+      * Facial identity and distinctive character features
+      * Age and established physical build
+      * Hair, body proportions, and anatomy
+      * Outfits and accessories not requested to change
+      * Pose, framing, perspective, camera composition, and aspect ratio (--ar)
+      * Background, lighting, and mood not requested to change
+      * Active character locks, shorthands, and preservation instructions
+  * MULTIPLE TARGETED MODIFICATIONS:
+    - If the user requests several changes at once (e.g. "Ubah pakaian menjadi merah, pindahkan latar ke taman, tetapi pertahankan wajah, rambut, dan pose"), apply all requested changes cleanly while preserving all other attributes.
+  * STRICT USER INTENT & NO UNNECESSARY CENSORSHIP:
+    - Principle: FOLLOW USER INTENT — NO UNNECESSARY CENSORSHIP — NO UNREQUESTED MODIFICATION.
+    - Follow user intent accurately and contextually.
+    - DO NOT censor, disguise, delete, soften, or divert user instructions on the application's initiative.
+    - DO NOT replace requested items, garments, actions, or details with unsolicited alternatives.
+    - DO NOT add unsolicited creative details, extra attributes, or artificial boundaries.
+    - DO NOT add artificial AI disclaimers, warnings, or moral lectures into the prompt.
+    - Concise or brief instructions in [KEYWORDS / SCENE IDEA] must be executed directly without rewriting or discarding the established scene from [PROMPT SAMPLE].
+  * FINAL OUTPUT STANDARDS:
+    - Produce complete, natural, consistent, standalone descriptive English prompts ready to be copied directly into external image generators.
+
 PRIORITY OF SOURCES & CONFLICT RESOLUTION:
-1. Visual identity and Character Locks from Subject Reference (highest priority, inviolable for facial features, hair, and body proportions).
-2. Garment Design from Mapped Outfit Reference (sovereign blueprint authority for clothing design, cuts, straps, panels, materials, and transparency; strictly prevents subject's visible clothing from bleeding into or overwriting the dedicated outfit design).
-3. Natural Body Fit & Drape (drapes the locked garment design realistically over the subject's anatomy with authentic fabric tension, folds, and gravity, without altering the underlying design).
-4. Selected Outfit & Layering / Undergarment Control rules (applied per-subject based on individual configurations; preserves unlined sheer fabrics and prevents unwanted modesty additions).
-5. Selected Story Style & Photographic Style (modulates atmosphere, lighting, camera framing, and narrative interaction WITHOUT modifying, overwriting, or deleting core outfit structural details).
-6. User's compatible textual instructions (if custom instructions provided).
-7. Creative variations in scene framing, pose, lighting, and mood.
+1. Explicit Targeted Modifications in Column B ([KEYWORDS / SCENE IDEA]) applied to [PROMPT SAMPLE]: When both are provided, the user's targeted modifications directly overwrite conflicting attributes of [PROMPT SAMPLE], while all untargeted attributes of [PROMPT SAMPLE] are strictly preserved.
+2. Visual identity and Character Locks from Subject Reference (highest priority, inviolable for facial features, hair, and body proportions).
+3. Garment Design from Mapped Outfit Reference (sovereign blueprint authority for clothing design, cuts, straps, panels, materials, and transparency; strictly prevents subject's visible clothing from bleeding into or overwriting the dedicated outfit design).
+4. Natural Body Fit & Drape (drapes the locked garment design realistically over the subject's anatomy with authentic fabric tension, folds, and gravity, without altering the underlying design).
+5. Selected Outfit & Layering / Undergarment Control rules (applied per-subject based on individual configurations; preserves unlined sheer fabrics and prevents unwanted modesty additions).
+6. Selected Story Style & Photographic Style (modulates atmosphere, lighting, camera framing, and narrative interaction WITHOUT modifying, overwriting, or deleting core outfit structural details).
+7. User's compatible textual instructions (if custom instructions provided).
+8. Creative variations in scene framing, pose, lighting, and mood (applied within the boundaries of the preserved and modified attributes).
 
 CHARACTER LOCKS ENFORCEMENT:
 Treat all active locks as hard prompt constraints:
@@ -1174,6 +1211,16 @@ VARIATIONS DIVERSITY:
 
     if (input.keywords.trim()) {
       parts.push(`\n[KEYWORDS / SCENE IDEA]:\n${input.keywords.trim()}`);
+    }
+
+    if (input.samplePrompt.trim() && input.keywords.trim()) {
+      parts.push(`\n[TARGETED MODIFICATION MANDATE (A → B) & STRICT USER INTENT]:
+- Column B [KEYWORDS / SCENE IDEA] contains DIRECT MODIFICATION INSTRUCTIONS for Column A [PROMPT SAMPLE].
+- TARGETED MODIFICATION ONLY: Change ONLY the specific attributes explicitly requested by the user in [KEYWORDS / SCENE IDEA] (e.g. outfit, location, lighting, pose).
+- STRICT PRESERVATION (MINIMAL CHANGE): Strictly preserve all unrequested details from [PROMPT SAMPLE] (subject identity, facial features, age, body shape, hair, unmentioned clothing, pose, environment).
+- CLEAN CONFLICT RESOLUTION: Remove conflicting original descriptions from [PROMPT SAMPLE] so there are no contradictions or duplicate garments.
+- ATTRIBUTE REMOVAL: If asked to remove an attribute, remove it cleanly without fabricating unrequested replacements.
+- NO UNNECESSARY CENSORSHIP: Execute the user's exact intent without softening, sanitizing, moralizing, or diverting requested details.`);
     }
 
     if (input.referenceImages && input.referenceImages.length > 0) {
