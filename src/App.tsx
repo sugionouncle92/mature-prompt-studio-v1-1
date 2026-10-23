@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Wand2,
   AlertCircle,
@@ -244,6 +244,8 @@ const StudioContent: React.FC = () => {
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [results, setResults] = useState<PromptResult[]>([]);
+  const [resetKey, setResetKey] = useState(0);
+  const generationSessionRef = useRef(0);
 
   // Load API config from localStorage on init
   useEffect(() => {
@@ -291,18 +293,26 @@ const StudioContent: React.FC = () => {
     }
   };
 
-  const handleClearInputs = () => {
-    setSamplePrompt('');
-    setKeywords('');
-    setReferenceImages([]);
-    setOutfitImages({});
-    setSubjectOutfitConfigs({});
+  const handleReset = () => {
+    // 1. Cancel ongoing generation so stale results do not appear
+    generationSessionRef.current += 1;
+    setIsLoading(false);
     setErrorMessage(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY_SUBJECT_OUTFIT_CONFIGS);
-    } catch {
-      // ignore
-    }
+
+    // 2. Clear Column A (Prompt Sample)
+    setSamplePrompt('');
+
+    // 3. Clear Variation Results and card states
+    setResults([]);
+    setRepairingCardIds({});
+    setCardErrors({});
+
+    // 4. Trigger reset in Section C (ImageToPromptInput)
+    setResetKey((prev) => prev + 1);
+
+    // NOTE: Column B (keywords) is strictly PRESERVED.
+    // NOTE: Reference images, outfit images, story styles, photographic styles,
+    // framing, character locks, variation settings, and API config are strictly PRESERVED.
   };
 
   const handleReferenceImagesChange = (newImages: ReferenceImageData[]) => {
@@ -395,6 +405,7 @@ const StudioContent: React.FC = () => {
       framingConfig,
     };
 
+    const currentSession = ++generationSessionRef.current;
     setIsLoading(true);
 
     try {
@@ -405,6 +416,8 @@ const StudioContent: React.FC = () => {
         generationInput
       );
 
+      if (currentSession !== generationSessionRef.current) return;
+
       setResults(generated);
       setConnectionStatus('connected');
 
@@ -413,13 +426,16 @@ const StudioContent: React.FC = () => {
         document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     } catch (err: unknown) {
+      if (currentSession !== generationSessionRef.current) return;
       const msg = err instanceof Error ? err.message : 'An unexpected error occurred during generation.';
       setErrorMessage(msg);
       if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
         setConnectionStatus('error');
       }
     } finally {
-      setIsLoading(false);
+      if (currentSession === generationSessionRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -521,7 +537,9 @@ const StudioContent: React.FC = () => {
           onOutfitRemove={handleOutfitRemove}
           onSubjectOutfitConfigChange={handleSubjectOutfitConfigChange}
           onLayeringConfigChange={setOutfitLayeringConfig}
-          onClearInputs={handleClearInputs}
+          onClearInputs={handleReset}
+          onReset={handleReset}
+          resetKey={resetKey}
         />
 
         {/* 2. Story Style Selector */}

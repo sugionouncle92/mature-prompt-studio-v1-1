@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera,
   Upload,
@@ -39,6 +39,7 @@ interface ImageToPromptInputProps {
   modelId: string;
   samplePrompt: string;
   onApplyToSamplePrompt: (newPrompt: string) => void;
+  resetKey?: number;
 }
 
 export const ImageToPromptInput: React.FC<ImageToPromptInputProps> = ({
@@ -46,6 +47,7 @@ export const ImageToPromptInput: React.FC<ImageToPromptInputProps> = ({
   modelId,
   samplePrompt,
   onApplyToSamplePrompt,
+  resetKey,
 }) => {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +66,23 @@ export const ImageToPromptInput: React.FC<ImageToPromptInputProps> = ({
   const [copied, setCopied] = useState(false);
   const [appliedToast, setAppliedToast] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const analysisSessionRef = useRef(0);
+
+  useEffect(() => {
+    if (resetKey !== undefined && resetKey > 0) {
+      analysisSessionRef.current += 1;
+      setImage(null);
+      setStatus('idle');
+      setAnalysisResult('');
+      setErrorMsg(null);
+      setCopied(false);
+      setAppliedToast(false);
+      setShowConfirmModal(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [resetKey]);
 
   const handleFileProcess = (file: File) => {
     setErrorMsg(null);
@@ -144,6 +163,7 @@ export const ImageToPromptInput: React.FC<ImageToPromptInputProps> = ({
       return;
     }
 
+    const currentSession = ++analysisSessionRef.current;
     setErrorMsg(null);
     setStatus('analyzing');
 
@@ -154,9 +174,11 @@ export const ImageToPromptInput: React.FC<ImageToPromptInputProps> = ({
         image.dataUrl,
         image.mimeType
       );
+      if (currentSession !== analysisSessionRef.current) return;
       setAnalysisResult(result);
       setStatus('success');
     } catch (err: unknown) {
+      if (currentSession !== analysisSessionRef.current) return;
       setStatus('error');
       const msg = err instanceof Error ? err.message : t.errAnalysisFailed;
       setErrorMsg(msg);

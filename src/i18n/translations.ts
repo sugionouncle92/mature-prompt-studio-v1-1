@@ -17,7 +17,7 @@ export const translations = {
     // Core Inputs
     inputsTitle: 'Input Utama Adegan',
     inputsSubtitle: 'Gunakan Prompt Sample, Keywords, atau gabungkan keduanya untuk generasi prompt terarah.',
-    resetInputs: 'Reset Input',
+    resetInputs: 'Reset',
     awaitingInput: 'Menunggu Input',
     awaitingInputDesc: 'Masukkan Prompt Sample, Keywords, atau keduanya untuk memulai.',
     combinedMode: 'Mode Gabungan (Sample + Keywords)',
@@ -376,7 +376,7 @@ export const translations = {
     // Core Inputs
     inputsTitle: 'Core Scene Inputs',
     inputsSubtitle: 'Use Prompt Sample, Keywords, or combine both for targeted prompt engineering.',
-    resetInputs: 'Reset Inputs',
+    resetInputs: 'Reset',
     awaitingInput: 'Awaiting Input',
     awaitingInputDesc: 'Enter a Prompt Sample, Keywords, or both to begin.',
     combinedMode: 'Combined Mode (Sample + Keywords)',

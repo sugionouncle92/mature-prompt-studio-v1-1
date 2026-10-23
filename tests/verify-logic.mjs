@@ -1974,8 +1974,57 @@ service1.testConnection('', 'gemini-2.5-flash').then((res) => {
   assert.ok(!appCode.includes('setIsLoading(true);\n    setResults([]);'), 'Must not clear results before try block in handleGenerate');
 
   console.log('✓ Strict User Intent & Targeted Prompt Modification (A → B) verified: System instruction, user prompt builder, minimal change enforcement, and failure safety.');
+}).then(() => {
+  // 19. Verify Reset Button & State Clearing Behavior
+  console.log('Test 19: Verify Reset Button (Reset Input -> Reset) & Full State Clearing Behavior...');
 
-  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (18/18) ---');
+  // 19a. Translation Label Verification
+  assert.strictEqual(translations.id.resetInputs, 'Reset', 'Indonesian label must be "Reset"');
+  assert.strictEqual(translations.en.resetInputs, 'Reset', 'English label must be "Reset"');
+
+  // 19b. App.tsx Reset Behavior Verification
+  const appSrc = fs.readFileSync('src/App.tsx', 'utf8');
+  assert.ok(appSrc.includes('const handleReset = () => {'), 'App.tsx must define handleReset');
+  assert.ok(appSrc.includes("setSamplePrompt('');"), 'handleReset must clear samplePrompt');
+  assert.ok(appSrc.includes('setResults([]);'), 'handleReset must clear results');
+  assert.ok(appSrc.includes('setRepairingCardIds({});'), 'handleReset must clear repairingCardIds');
+  assert.ok(appSrc.includes('setCardErrors({});'), 'handleReset must clear cardErrors');
+  assert.ok(appSrc.includes('setIsLoading(false);'), 'handleReset must reset isLoading to false');
+  assert.ok(appSrc.includes('setErrorMessage(null);'), 'handleReset must reset errorMessage to null');
+  assert.ok(appSrc.includes('generationSessionRef.current += 1;'), 'handleReset must cancel in-flight generation');
+  assert.ok(appSrc.includes('setResetKey((prev) => prev + 1);'), 'handleReset must trigger resetKey for Section C');
+
+  // Verify Column B & other configurations are preserved (NOT cleared in handleReset)
+  const handleResetStart = appSrc.indexOf('const handleReset = () => {');
+  assert.ok(handleResetStart !== -1, 'handleReset function must be defined');
+  const handleResetEnd = appSrc.indexOf('};', handleResetStart);
+  const handleResetBody = appSrc.substring(handleResetStart, handleResetEnd);
+  assert.ok(!handleResetBody.includes("setKeywords('');"), 'handleReset must NOT clear keywords (Column B must be preserved)');
+  assert.ok(!handleResetBody.includes('setReferenceImages([]);'), 'handleReset must NOT clear reference images');
+  assert.ok(!handleResetBody.includes('setOutfitImages({});'), 'handleReset must NOT clear outfit images');
+  assert.ok(!handleResetBody.includes('setStoryStyle('), 'handleReset must NOT reset Story Style');
+  assert.ok(!handleResetBody.includes('setPhotographicStyle('), 'handleReset must NOT reset Photographic Style');
+  assert.ok(!handleResetBody.includes('setFramingConfig('), 'handleReset must NOT reset Framing Config');
+  assert.ok(!handleResetBody.includes('setCharacterLocks('), 'handleReset must NOT reset Character Locks');
+
+  // 19c. InputSection.tsx Verification
+  const inputSectionSrc = fs.readFileSync('src/components/InputSection.tsx', 'utf8');
+  assert.ok(inputSectionSrc.includes('{t.resetInputs}'), 'InputSection must render button using t.resetInputs');
+  assert.ok(inputSectionSrc.includes('resetKey={resetKey}'), 'InputSection must pass resetKey to ImageToPromptInput');
+
+  // 19d. ImageToPromptInput.tsx Verification
+  const imgSectionSrc = fs.readFileSync('src/components/ImageToPromptInput.tsx', 'utf8');
+  assert.ok(imgSectionSrc.includes('resetKey?: number;'), 'ImageToPromptInputProps must accept resetKey');
+  assert.ok(imgSectionSrc.includes('setImage(null);'), 'resetKey effect must clear image');
+  assert.ok(imgSectionSrc.includes("setStatus('idle');"), 'resetKey effect must reset status to idle');
+  assert.ok(imgSectionSrc.includes("setAnalysisResult('');"), 'resetKey effect must clear analysisResult');
+  assert.ok(imgSectionSrc.includes('setErrorMsg(null);'), 'resetKey effect must clear errorMsg');
+  assert.ok(imgSectionSrc.includes("fileInputRef.current.value = '';"), 'resetKey effect must clear file input value so same file can be uploaded again');
+  assert.ok(imgSectionSrc.includes('analysisSessionRef.current += 1;'), 'resetKey effect must cancel in-flight image analysis');
+
+  console.log('✓ Reset button verified: Renamed to "Reset", clears Column A, Section C image, visual analysis result, prompt variations, and process state while strictly preserving Column B keywords and all user settings.');
+
+  console.log('\n--- ALL TEST SUITE CHECKS PASSED SUCCESSFULLY (19/19) ---');
 }).catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);

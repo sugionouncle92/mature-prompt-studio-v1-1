@@ -22,7 +22,9 @@ interface InputSectionProps {
   onOutfitRemove: (subjectId: string) => void;
   onSubjectOutfitConfigChange: (subjectId: string, config: SubjectOutfitConfig) => void;
   onLayeringConfigChange?: (config: OutfitLayeringConfig) => void;
-  onClearInputs: () => void;
+  onClearInputs?: () => void;
+  onReset?: () => void;
+  resetKey?: number;
 }
 
 export const InputSection: React.FC<InputSectionProps> = ({
@@ -40,11 +42,13 @@ export const InputSection: React.FC<InputSectionProps> = ({
   onOutfitRemove,
   onSubjectOutfitConfigChange,
   onClearInputs,
+  onReset,
+  resetKey,
 }) => {
   const { t } = useLanguage();
   const hasSample = samplePrompt.trim().length > 0;
   const hasKeywords = keywords.trim().length > 0;
-  const hasImages = referenceImages.length > 0;
+  const handleReset = onReset || onClearInputs;
 
   // Determine active logic
   let logicBadge = {
@@ -88,10 +92,10 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {(hasSample || hasKeywords || hasImages) && (
+          {handleReset && (
             <button
-              onClick={onClearInputs}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+              onClick={handleReset}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition cursor-pointer"
               title={t.resetInputs}
             >
               <RotateCcw className="w-3 h-3" />
@@ -172,6 +176,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
         modelId={modelId}
         samplePrompt={samplePrompt}
         onApplyToSamplePrompt={onSamplePromptChange}
+        resetKey={resetKey}
       />
 
       {/* Optional Reference Images Input (Multi-Image Subject Reference) */}
